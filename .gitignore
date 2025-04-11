@@ -158,3 +158,62 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+# Flutter/Dart
+**/doc/api/
+**/ios/Flutter/.last_build_id
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+frontend/build/
+frontend/coverage/
+frontend/.metadata
+frontend/pubspec.lock
+
+# Android
+frontend/android/app/debug
+frontend/android/app/profile
+frontend/android/app/release
+frontend/android/key.properties
+frontend/android/local.properties
+frontend/android/**/gradle-wrapper.jar
+frontend/android/.gradle
+frontend/android/captures/
+
+# iOS
+frontend/ios/Pods/
+frontend/ios/.symlinks/
+frontend/ios/Flutter/App.framework
+frontend/ios/Flutter/Flutter.framework
+frontend/ios/Flutter/Flutter.podspec
+frontend/ios/Flutter/Generated.xcconfig
+frontend/ios/Flutter/ephemeral
+frontend/ios/Runner.xcworkspace/xcshareddata/
+frontend/ios/.generated/
+frontend/ios/build/
+
+# Firebase config files (to avoid exposing API keys)
+google-services.json
+GoogleService-Info.plist
+firebase-credentials.json
+**/firebase_options.dart
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix
+
+# Emulator
+.android/
+.ios/
+
+# Flutter web build files
+frontend/web/assets/
+frontend/web/packages/
