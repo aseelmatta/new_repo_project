@@ -101,7 +101,7 @@ class _AvailableDeliveriesScreenState extends State<AvailableDeliveriesScreen> {
       builder: (context) => DeliveryDetailsSheet(
         delivery: delivery,
         onAccept: () {
-          // Handle delivery acceptance
+          // Handle delivery acceptance TODO
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Delivery #${delivery.id} accepted!')),
           );
