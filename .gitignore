@@ -216,3 +216,8 @@ firebase-credentials.json
 # Flutter web build files
 frontend/web/assets/
 frontend/web/packages/
+
+# Flutter/Dart generated files
+**/generated_plugin_registrant.*
+**/GeneratedPluginRegistrant.*
+**/generated_plugins.cmake
