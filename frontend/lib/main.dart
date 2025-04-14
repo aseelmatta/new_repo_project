@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'screens/map_test_screen.dart';
+//import 'screens/map_test_screen.dart';
+import 'screens/available_deliveries_screen.dart';
 void main() {
   runApp(const MyApp());
 }
@@ -31,7 +32,9 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       // home: const MyHomePage(title: 'Flutter Demo Home Page'),
-      home: const MapTestScreen(),//try the map screen
+      // home: const MapTestScreen(), //try the map screen
+      home: AvailableDeliveriesScreen(), //try the deliveries screen 
+
     );
   }
 }
