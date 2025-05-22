@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/delivery.dart';
 import '../services/mock_delivery_service.dart';
+import 'business_history_page.dart';
+import 'business_profile_page.dart';
 
 class BusinessDashboard extends StatefulWidget {
   const BusinessDashboard({super.key});
@@ -17,17 +19,39 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
   bool _showMapView = false;
   String _statusFilter = 'all';
   GoogleMapController? _mapController;
+  int _currentIndex = 0; // For bottom navigation
+
+  // Page controller for navigation
+  PageController? _pageController;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _loadDeliveries();
+  }
+
+  @override
+  void dispose() {
+    _pageController?.dispose();
+    super.dispose();
   }
 
   void _loadDeliveries() {
     setState(() {
       _deliveries = _deliveryService.getMockDeliveries();
     });
+  }
+
+  void _onNavigationTap(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+    _pageController?.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _showDeliveryDetails(Delivery delivery) {
@@ -58,7 +82,7 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
             _buildInfoRow('Pickup:', delivery.pickupAddress),
             _buildInfoRow('Dropoff:', delivery.dropoffAddress),
             _buildInfoRow('Description:', delivery.description),
-            _buildInfoRow('Created:', '2 hours ago'), // Mock data
+            _buildInfoRow('Created:', '2 hours ago'),
             const SizedBox(height: 16),
             
             if (delivery.status == 'in_progress' || delivery.status == 'accepted')
@@ -66,7 +90,7 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildInfoSection('Courier Information'),
-                  _buildInfoRow('Name:', 'John Doe'), // Mock data
+                  _buildInfoRow('Name:', 'John Doe'),
                   _buildInfoRow('Rating:', '4.8 ★'),
                   _buildInfoRow('Expected delivery:', '15:30'),
                   Row(
@@ -212,351 +236,293 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
   }
 
   void _showCreateDeliveryForm() {
-  LatLng? pickupLocation;
-  LatLng? dropoffLocation;
-  String pickupAddress = '';
-  String dropoffAddress = '';
-  bool selectingPickup = true; // To track which location we're selecting (pickup or dropoff)
-  TextEditingController pickupController = TextEditingController();
-  TextEditingController dropoffController = TextEditingController();
-  
-  // This controller will be used for the map in location selection mode
-  GoogleMapController? mapController;
-  
-  // Function to handle address selection from map
-  void showMapSelector(BuildContext context, bool isPickup) {
-    selectingPickup = isPickup;
+    LatLng? pickupLocation;
+    LatLng? dropoffLocation;
+    String pickupAddress = '';
+    String dropoffAddress = '';
+    bool selectingPickup = true;
+    TextEditingController pickupController = TextEditingController();
+    TextEditingController dropoffController = TextEditingController();
+    GoogleMapController? mapController;
     
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Column(
-          children: [
-            AppBar(
-              title: Text('Select ${isPickup ? 'Pickup' : 'Dropoff'} Location'),
-              leading: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    // Confirm selection
-                    if (selectingPickup && pickupLocation != null) {
-                      // Convert the coordinates to an address (normally you'd use reverse geocoding)
-                      pickupAddress = 'Location at ${pickupLocation!.latitude}, ${pickupLocation!.longitude}';
-                      pickupController.text = pickupAddress;
-                    } else if (!selectingPickup && dropoffLocation != null) {
-                      dropoffAddress = 'Location at ${dropoffLocation!.latitude}, ${dropoffLocation!.longitude}';
-                      dropoffController.text = dropoffAddress;
-                    }
-                    Navigator.pop(context);
-                  },
-                  child: const Text('CONFIRM', style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search for a location...',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+    void showMapSelector(BuildContext context, bool isPickup) {
+      selectingPickup = isPickup;
+      
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setModalState) => Container(
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: Column(
+              children: [
+                AppBar(
+                  title: Text('Select ${isPickup ? 'Pickup' : 'Dropoff'} Location'),
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                ),
-                onSubmitted: (value) {
-                  // Here you would normally geocode the address to get coordinates
-                  // For now, we'll just update the UI with a message
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Search functionality would connect to Places API')),
-                  );
-                },
-              ),
-            ),
-            Expanded(
-              child: GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: const LatLng(37.4219999, -122.0840575), // Default location (can be current user location)
-                  zoom: 14,
-                ),
-                onMapCreated: (GoogleMapController controller) {
-                  mapController = controller;
-                },
-                markers: {
-                  if (selectingPickup && pickupLocation != null)
-                    Marker(
-                      markerId: const MarkerId('pickup'),
-                      position: pickupLocation!,
-                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        if (selectingPickup && pickupLocation != null) {
+                          pickupAddress = 'Location at ${pickupLocation!.latitude.toStringAsFixed(4)}, ${pickupLocation!.longitude.toStringAsFixed(4)}';
+                          pickupController.text = pickupAddress;
+                        } else if (!selectingPickup && dropoffLocation != null) {
+                          dropoffAddress = 'Location at ${dropoffLocation!.latitude.toStringAsFixed(4)}, ${dropoffLocation!.longitude.toStringAsFixed(4)}';
+                          dropoffController.text = dropoffAddress;
+                        }
+                        Navigator.pop(context);
+                      },
+                      child: const Text('CONFIRM', style: TextStyle(color: Colors.white)),
                     ),
-                  if (!selectingPickup && dropoffLocation != null)
-                    Marker(
-                      markerId: const MarkerId('dropoff'),
-                      position: dropoffLocation!,
-                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-                    ),
-                },
-                onTap: (LatLng location) {
-                  // Update marker position on map tap
-                  if (selectingPickup) {
-                    pickupLocation = location;
-                  } else {
-                    dropoffLocation = location;
-                  }
-                  
-                  // Refresh the UI to show the new marker
-                  (context as Element).markNeedsBuild();
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) => Container(
-        padding: const EdgeInsets.all(16) + EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        height: MediaQuery.of(context).size.height * 0.9,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Create New Delivery',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 24),
-              
-              // Pickup location input with map button
-              Text(
-                'Pickup Location',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: pickupController,
-                      decoration: const InputDecoration(
-                        hintText: 'Pickup address',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_on, color: Colors.green),
-                      ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search for a location...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.map, color: Colors.green),
-                    onPressed: () {
-                      showMapSelector(context, true);
+                    onSubmitted: (value) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Search functionality would connect to Places API')),
+                      );
                     },
                   ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Dropoff location input with map button
-              Text(
-                'Dropoff Location',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: dropoffController,
-                      decoration: const InputDecoration(
-                        hintText: 'Dropoff address',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_on, color: Colors.red),
-                      ),
+                Expanded(
+                  child: GoogleMap(
+                    initialCameraPosition: const CameraPosition(
+                      target: LatLng(37.4219999, -122.0840575),
+                      zoom: 14,
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.map, color: Colors.red),
-                    onPressed: () {
-                      showMapSelector(context, false);
+                    onMapCreated: (GoogleMapController controller) {
+                      mapController = controller;
                     },
-                  ),
-                ],
-              ),
-              
-              // Map preview if both locations are selected
-              if (pickupLocation != null && dropoffLocation != null)
-                Container(
-                  margin: const EdgeInsets.symmetric(vertical: 16),
-                  height: 200,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: GoogleMap(
-                      initialCameraPosition: CameraPosition(
-                        target: LatLng(
-                          (pickupLocation!.latitude + dropoffLocation!.latitude) / 2,
-                          (pickupLocation!.longitude + dropoffLocation!.longitude) / 2,
-                        ),
-                        zoom: 12,
-                      ),
-                      markers: {
+                    markers: {
+                      if (selectingPickup && pickupLocation != null)
                         Marker(
                           markerId: const MarkerId('pickup'),
                           position: pickupLocation!,
                           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-                          infoWindow: const InfoWindow(title: 'Pickup'),
                         ),
+                      if (!selectingPickup && dropoffLocation != null)
                         Marker(
                           markerId: const MarkerId('dropoff'),
                           position: dropoffLocation!,
                           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-                          infoWindow: const InfoWindow(title: 'Dropoff'),
                         ),
-                      },
-                      polylines: {
-                        Polyline(
-                          polylineId: const PolylineId('route'),
-                          points: [pickupLocation!, dropoffLocation!],
-                          color: Colors.blue,
-                          width: 5,
+                    },
+                    onTap: (LatLng location) {
+                      setModalState(() {
+                        if (selectingPickup) {
+                          pickupLocation = location;
+                        } else {
+                          dropoffLocation = location;
+                        }
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setFormState) => Container(
+          padding: const EdgeInsets.all(16) + EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          height: MediaQuery.of(context).size.height * 0.9,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Create New Delivery', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 24),
+                
+                Text('Pickup Location', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: pickupController,
+                        decoration: const InputDecoration(
+                          hintText: 'Pickup address',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on, color: Colors.green),
                         ),
-                      },
-                      liteModeEnabled: true, // Lite mode for preview to save resources
-                      zoomControlsEnabled: false,
-                      scrollGesturesEnabled: false,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.map, color: Colors.green),
+                      onPressed: () => showMapSelector(context, true),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                Text('Dropoff Location', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: dropoffController,
+                        decoration: const InputDecoration(
+                          hintText: 'Dropoff address',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on, color: Colors.red),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.map, color: Colors.red),
+                      onPressed: () => showMapSelector(context, false),
+                    ),
+                  ],
+                ),
+                
+                // Map preview if both locations are selected
+                if (pickupLocation != null && dropoffLocation != null)
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 16),
+                    height: 200,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: LatLng(
+                            (pickupLocation!.latitude + dropoffLocation!.latitude) / 2,
+                            (pickupLocation!.longitude + dropoffLocation!.longitude) / 2,
+                          ),
+                          zoom: 12,
+                        ),
+                        markers: {
+                          Marker(
+                            markerId: const MarkerId('pickup'),
+                            position: pickupLocation!,
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                            infoWindow: const InfoWindow(title: 'Pickup'),
+                          ),
+                          Marker(
+                            markerId: const MarkerId('dropoff'),
+                            position: dropoffLocation!,
+                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                            infoWindow: const InfoWindow(title: 'Dropoff'),
+                          ),
+                        },
+                        polylines: {
+                          Polyline(
+                            polylineId: const PolylineId('route'),
+                            points: [pickupLocation!, dropoffLocation!],
+                            color: Colors.blue,
+                            width: 5,
+                          ),
+                        },
+                        liteModeEnabled: true,
+                        zoomControlsEnabled: false,
+                        scrollGesturesEnabled: false,
+                      ),
                     ),
                   ),
+                
+                const SizedBox(height: 16),
+                Text('Package Details', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                const SizedBox(height: 8),
+                const TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Package description (size, weight, contents, etc.)',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.inventory),
+                  ),
+                  maxLines: 3,
                 ),
-              
-              const SizedBox(height: 16),
-              
-              // Package details
-              Text(
-                'Package Details',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
+                
+                const SizedBox(height: 16),
+                Text('Recipient Information', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                const SizedBox(height: 8),
+                const TextField(
+                  decoration: InputDecoration(
+                    labelText: 'Recipient Name',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const TextField(
-                decoration: InputDecoration(
-                  hintText: 'Package description (size, weight, contents, etc.)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.inventory),
+                const SizedBox(height: 16),
+                const TextField(
+                  decoration: InputDecoration(
+                    labelText: 'Recipient Phone',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                  keyboardType: TextInputType.phone,
                 ),
-                maxLines: 3,
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Recipient information
-              Text(
-                'Recipient Information',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
+                
+                const SizedBox(height: 16),
+                Text('Delivery Instructions (Optional)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                const SizedBox(height: 8),
+                const TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Special instructions for the courier',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.info_outline),
+                  ),
+                  maxLines: 2,
                 ),
-              ),
-              const SizedBox(height: 8),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Recipient Name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Recipient Phone',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Delivery instructions (optional)
-              Text(
-                'Delivery Instructions (Optional)',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 8),
-              const TextField(
-                decoration: InputDecoration(
-                  hintText: 'Special instructions for the courier',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.info_outline),
-                ),
-                maxLines: 2,
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Submit button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Validate inputs
-                    if (pickupLocation == null || dropoffLocation == null) {
+                
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (pickupLocation == null || dropoffLocation == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please select both pickup and dropoff locations'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Please select both pickup and dropoff locations'),
-                          backgroundColor: Colors.red,
+                          content: Text('Delivery created successfully!'),
+                          backgroundColor: Colors.green,
                         ),
                       );
-                      return;
-                    }
-                    
-                    // Handle form submission
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Delivery created successfully!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    },
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                    child: const Text('Create Delivery'),
                   ),
-                  child: const Text('Create Delivery'),
                 ),
-              ),
-              const SizedBox(height: 24), // Extra padding at bottom
-            ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
-  @override
-  Widget build(BuildContext context) {
-    // Filter deliveries based on search query and status filter
+    );
+  }
+
+  // Dashboard page content
+  Widget _buildDashboardPage() {
     final filteredDeliveries = _deliveries.where((delivery) {
       bool matchesSearch = delivery.pickupAddress.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           delivery.dropoffAddress.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -567,243 +533,200 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
       return matchesSearch && matchesFilter;
     }).toList();
 
-    // Count deliveries by status for analytics
     int pendingCount = _deliveries.where((d) => d.status == 'pending').length;
     int inProgressCount = _deliveries.where((d) => d.status == 'in_progress' || d.status == 'accepted').length;
     int completedCount = _deliveries.where((d) => d.status == 'completed').length;
     int cancelledCount = _deliveries.where((d) => d.status == 'cancelled').length;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Business Dashboard'),
-        actions: [
-          IconButton(
-            icon: Icon(_showMapView ? Icons.list : Icons.map),
-            onPressed: () {
-              setState(() {
-                _showMapView = !_showMapView;
-              });
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Analytics Card
-          Card(
-            margin: const EdgeInsets.all(8),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Delivery Summary',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStatCard('Pending', pendingCount, Colors.orange),
-                      _buildStatCard('Active', inProgressCount, Colors.blue),
-                      _buildStatCard('Completed', completedCount, Colors.green),
-                      _buildStatCard('Cancelled', cancelledCount, Colors.red),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Simple visual chart without external package
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      height: 30,
-                      child: Row(
-                        children: [
-                          if (pendingCount > 0)
-                            Expanded(
-                              flex: pendingCount,
-                              child: Container(color: Colors.orange),
-                            ),
-                          if (inProgressCount > 0)
-                            Expanded(
-                              flex: inProgressCount,
-                              child: Container(color: Colors.blue),
-                            ),
-                          if (completedCount > 0)
-                            Expanded(
-                              flex: completedCount,
-                              child: Container(color: Colors.green),
-                            ),
-                          if (cancelledCount > 0)
-                            Expanded(
-                              flex: cancelledCount,
-                              child: Container(color: Colors.red),
-                            ),
-                          if (pendingCount + inProgressCount + completedCount + cancelledCount == 0)
-                            Expanded(
-                              child: Container(
-                                color: Colors.grey[300],
-                                child: Center(
-                                  child: Text('No deliveries yet'),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Search and Filter
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
+    return Column(
+      children: [
+        // Analytics Card
+        Card(
+          margin: const EdgeInsets.all(8),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Search deliveries...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(vertical: 0),
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                DropdownButton<String>(
-                  value: _statusFilter,
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All')),
-                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                    DropdownMenuItem(value: 'accepted', child: Text('Accepted')),
-                    DropdownMenuItem(value: 'in_progress', child: Text('In Progress')),
-                    DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                    DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                const Text('Delivery Summary', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildStatCard('Pending', pendingCount, Colors.orange),
+                    _buildStatCard('Active', inProgressCount, Colors.blue),
+                    _buildStatCard('Completed', completedCount, Colors.green),
+                    _buildStatCard('Cancelled', cancelledCount, Colors.red),
                   ],
-                  onChanged: (value) {
-                    setState(() {
-                      _statusFilter = value!;
-                    });
-                  },
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    height: 30,
+                    child: Row(
+                      children: [
+                        if (pendingCount > 0) Expanded(flex: pendingCount, child: Container(color: Colors.orange)),
+                        if (inProgressCount > 0) Expanded(flex: inProgressCount, child: Container(color: Colors.blue)),
+                        if (completedCount > 0) Expanded(flex: completedCount, child: Container(color: Colors.green)),
+                        if (cancelledCount > 0) Expanded(flex: cancelledCount, child: Container(color: Colors.red)),
+                        if (pendingCount + inProgressCount + completedCount + cancelledCount == 0)
+                          Expanded(child: Container(color: Colors.grey[300], child: const Center(child: Text('No deliveries yet')))),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          
-          // Deliveries List/Map
-          Expanded(
-            child: _showMapView
-                ? GoogleMap(
-                    initialCameraPosition: const CameraPosition(
-                      target: LatLng(37.4219999, -122.0840575),
-                      zoom: 12,
-                    ),
-                    markers: {
-                      ...filteredDeliveries.map(
-                        (delivery) => Marker(
-                          markerId: MarkerId(delivery.id),
-                          position: delivery.pickupLocation,
-                          infoWindow: InfoWindow(
-                            title: 'Delivery #${delivery.id}',
-                            snippet: delivery.status,
-                          ),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                            _getMarkerHue(delivery.status),
-                          ),
-                          onTap: () => _showDeliveryDetails(delivery),
-                        ),
-                      ),
-                    },
-                    onMapCreated: (GoogleMapController controller) {
-                      _mapController = controller;
-                    },
-                  )
-                : filteredDeliveries.isEmpty
-                    ? const Center(
-                        child: Text('No deliveries found'),
-                      )
-                    : ListView.builder(
-                        itemCount: filteredDeliveries.length,
-                        itemBuilder: (context, index) {
-                          final delivery = filteredDeliveries[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            child: ListTile(
-                              title: Text('Delivery #${delivery.id}'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('From: ${delivery.pickupAddress}'),
-                                  Text('To: ${delivery.dropoffAddress}'),
-                                  const SizedBox(height: 4),
-                                  LinearProgressIndicator(
-                                    value: _getProgressValue(delivery.status),
-                                    backgroundColor: Colors.grey[200],
-                                    color: _getStatusColor(delivery.status),
-                                  ),
-                                ],
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    _getStatusIcon(delivery.status),
-                                    color: _getStatusColor(delivery.status),
-                                  ),
-                                  Text(
-                                    delivery.status,
-                                    style: TextStyle(
-                                      color: _getStatusColor(delivery.status),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              isThreeLine: true,
-                              onTap: () => _showDeliveryDetails(delivery),
-                            ),
-                          );
-                        },
-                      ),
+        ),
+        
+        // Search and Filter
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Search deliveries...',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(vertical: 0),
+                  ),
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                ),
+              ),
+              const SizedBox(width: 8),
+              DropdownButton<String>(
+                value: _statusFilter,
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('All')),
+                  DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                  DropdownMenuItem(value: 'accepted', child: Text('Accepted')),
+                  DropdownMenuItem(value: 'in_progress', child: Text('In Progress')),
+                  DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                  DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                ],
+                onChanged: (value) => setState(() => _statusFilter = value!),
+              ),
+            ],
           ),
-        ],
+        ),
+        
+        // Toggle buttons
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => setState(() => _showMapView = false),
+                icon: const Icon(Icons.list),
+                label: const Text('List View'),
+                style: ElevatedButton.styleFrom(backgroundColor: !_showMapView ? Colors.blue : Colors.grey),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => setState(() => _showMapView = true),
+                icon: const Icon(Icons.map),
+                label: const Text('Map View'),
+                style: ElevatedButton.styleFrom(backgroundColor: _showMapView ? Colors.blue : Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        
+        // Content
+        Expanded(
+          child: _showMapView
+              ? GoogleMap(
+                  initialCameraPosition: const CameraPosition(target: LatLng(37.4219999, -122.0840575), zoom: 12),
+                  markers: {
+                    ...filteredDeliveries.map((delivery) => Marker(
+                      markerId: MarkerId(delivery.id),
+                      position: delivery.pickupLocation,
+                      infoWindow: InfoWindow(title: 'Delivery #${delivery.id}', snippet: delivery.status),
+                      icon: BitmapDescriptor.defaultMarkerWithHue(_getMarkerHue(delivery.status)),
+                      onTap: () => _showDeliveryDetails(delivery),
+                    )),
+                  },
+                  onMapCreated: (controller) => _mapController = controller,
+                )
+              : filteredDeliveries.isEmpty
+                  ? const Center(child: Text('No deliveries found'))
+                  : ListView.builder(
+                      itemCount: filteredDeliveries.length,
+                      itemBuilder: (context, index) {
+                        final delivery = filteredDeliveries[index];
+                        return Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: ListTile(
+                            title: Text('Delivery #${delivery.id}'),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('From: ${delivery.pickupAddress}'),
+                                Text('To: ${delivery.dropoffAddress}'),
+                                const SizedBox(height: 4),
+                                LinearProgressIndicator(
+                                  value: _getProgressValue(delivery.status),
+                                  backgroundColor: Colors.grey[200],
+                                  color: _getStatusColor(delivery.status),
+                                ),
+                              ],
+                            ),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(_getStatusIcon(delivery.status), color: _getStatusColor(delivery.status)),
+                                Text(delivery.status, style: TextStyle(color: _getStatusColor(delivery.status), fontSize: 12)),
+                              ],
+                            ),
+                            isThreeLine: true,
+                            onTap: () => _showDeliveryDetails(delivery),
+                          ),
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_currentIndex == 0 ? 'Business Dashboard' : _currentIndex == 1 ? 'Delivery History' : 'Profile'),
+        actions: _currentIndex == 0 ? [
+          IconButton(
+            icon: Icon(_showMapView ? Icons.list : Icons.map),
+            onPressed: () => setState(() => _showMapView = !_showMapView),
+          ),
+        ] : null,
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      body: _pageController != null ? PageView(
+        controller: _pageController,
+        onPageChanged: (index) => setState(() => _currentIndex = index),
+        children: [
+          _buildDashboardPage(),
+          const BusinessHistoryPage(),
+          const BusinessProfilePage(),
+        ],
+      ) : const Center(child: CircularProgressIndicator()),
+      floatingActionButton: _currentIndex == 0 ? FloatingActionButton.extended(
         onPressed: _showCreateDeliveryForm,
         label: const Text('New Delivery'),
         icon: const Icon(Icons.add),
-      ),
+      ) : null,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
+        currentIndex: _currentIndex,
+        onTap: _onNavigationTap,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'History',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
-        onTap: (index) {
-          // TODO: Implement navigation
-        },
       ),
     );
   }
@@ -811,83 +734,50 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
   Widget _buildStatCard(String title, int count, Color color) {
     return Column(
       children: [
-        Text(
-          count.toString(),
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          title,
-          style: const TextStyle(
-            color: Colors.grey,
-          ),
-        ),
+        Text(count.toString(), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+        Text(title, style: const TextStyle(color: Colors.grey)),
       ],
     );
   }
 
   double _getProgressValue(String status) {
     switch (status) {
-      case 'pending':
-        return 0.2;
-      case 'accepted':
-        return 0.4;
-      case 'in_progress':
-        return 0.7;
-      case 'completed':
-        return 1.0;
-      case 'cancelled':
-        return 1.0;
-      default:
-        return 0.0;
+      case 'pending': return 0.2;
+      case 'accepted': return 0.4;
+      case 'in_progress': return 0.7;
+      case 'completed': return 1.0;
+      case 'cancelled': return 1.0;
+      default: return 0.0;
     }
   }
 
   IconData _getStatusIcon(String status) {
     switch (status) {
-      case 'completed':
-        return Icons.check_circle;
-      case 'cancelled':
-        return Icons.cancel;
-      case 'in_progress':
-        return Icons.local_shipping;
-      case 'accepted':
-        return Icons.thumb_up;
-      default:
-        return Icons.pending;
+      case 'completed': return Icons.check_circle;
+      case 'cancelled': return Icons.cancel;
+      case 'in_progress': return Icons.local_shipping;
+      case 'accepted': return Icons.thumb_up;
+      default: return Icons.pending;
     }
   }
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'completed':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      case 'in_progress':
-        return Colors.blue;
-      case 'accepted':
-        return Colors.orange;
-      default:
-        return Colors.grey;
+      case 'completed': return Colors.green;
+      case 'cancelled': return Colors.red;
+      case 'in_progress': return Colors.blue;
+      case 'accepted': return Colors.orange;
+      default: return Colors.grey;
     }
   }
 
   double _getMarkerHue(String status) {
     switch (status) {
-      case 'completed':
-        return BitmapDescriptor.hueGreen;
-      case 'cancelled':
-        return BitmapDescriptor.hueRed;
-      case 'in_progress':
-        return BitmapDescriptor.hueBlue;
-      case 'accepted':
-        return BitmapDescriptor.hueOrange;
-      default:
-        return BitmapDescriptor.hueViolet;
+      case 'completed': return BitmapDescriptor.hueGreen;
+      case 'cancelled': return BitmapDescriptor.hueRed;
+      case 'in_progress': return BitmapDescriptor.hueBlue;
+      case 'accepted': return BitmapDescriptor.hueOrange;
+      default: return BitmapDescriptor.hueViolet;
     }
   }
 }
