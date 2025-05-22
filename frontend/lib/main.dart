@@ -25,10 +25,17 @@ class MyApp extends StatelessWidget {
         future: AuthService.getUserRole(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const CircularProgressIndicator();
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          } else if (snapshot.hasError) {
+            return const WelcomePage();
           } else {
             final userRole = snapshot.data;
             if (userRole == null) {
+              //return const BusinessDashboard();
               return const WelcomePage();
             } else if (userRole == 'courier') {
               return const CourierDashboard();
