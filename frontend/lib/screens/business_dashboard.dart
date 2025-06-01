@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/delivery.dart';
 import '../services/mock_delivery_service.dart';
-import 'business_history_page.dart';
+import 'business_chat_page.dart';
 import 'business_profile_page.dart';
 
 class BusinessDashboard extends StatefulWidget {
@@ -111,7 +111,6 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            // TODO: Implement live tracking
                             Navigator.pop(context);
                             setState(() {
                               _showMapView = true;
@@ -697,7 +696,7 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentIndex == 0 ? 'Business Dashboard' : _currentIndex == 1 ? 'Delivery History' : 'Profile'),
+        title: Text(_currentIndex == 0 ? 'FETCH Dashboard' : _currentIndex == 1 ? 'Support Chat' : 'Profile'),
         actions: _currentIndex == 0 ? [
           IconButton(
             icon: Icon(_showMapView ? Icons.list : Icons.map),
@@ -710,7 +709,7 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
         onPageChanged: (index) => setState(() => _currentIndex = index),
         children: [
           _buildDashboardPage(),
-          const BusinessHistoryPage(),
+          const BusinessChatPage(),
           const BusinessProfilePage(),
         ],
       ) : const Center(child: CircularProgressIndicator()),
@@ -723,9 +722,18 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
         currentIndex: _currentIndex,
         onTap: _onNavigationTap,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard), 
+            label: 'Dashboard'
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble), 
+            label: 'Support'
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person), 
+            label: 'Profile'
+          ),
         ],
       ),
     );

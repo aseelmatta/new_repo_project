@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import '../services/gemini_ai_service.dart';
 
 class BusinessChatPage extends StatefulWidget {
   const BusinessChatPage({super.key});
@@ -20,7 +19,12 @@ class _BusinessChatPageState extends State<BusinessChatPage> {
   @override
   void initState() {
     super.initState();
+    _initializeAI();
     _addWelcomeMessage();
+  }
+
+  Future<void> _initializeAI() async {
+    await GeminiAIService.initialize();
   }
 
   @override
@@ -62,85 +66,64 @@ class _BusinessChatPageState extends State<BusinessChatPage> {
   }
 
   Future<void> _getAIResponse(String userMessage) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
+    // Simulate thinking time
+    await Future.delayed(const Duration(milliseconds: 800));
 
-    String response = await _generateResponse(userMessage);
-    
-    setState(() {
-      _isTyping = false;
-      _messages.add(ChatMessage(
-        text: response,
-        isUser: false,
-        timestamp: DateTime.now(),
-      ));
-    });
+    try {
+      String response;
+      
+      if (_isConnectedToHuman) {
+        // Simulate human responses
+        response = _getHumanResponse(userMessage);
+      } else {
+        // Use Gemini AI
+        response = await GeminiAIService.getResponse(userMessage);
+      }
+      
+      setState(() {
+        _isTyping = false;
+        _messages.add(ChatMessage(
+          text: response,
+          isUser: false,
+          timestamp: DateTime.now(),
+          isHuman: _isConnectedToHuman,
+        ));
+      });
+    } catch (e) {
+      setState(() {
+        _isTyping = false;
+        _messages.add(ChatMessage(
+          text: "I'm experiencing some technical difficulties right now. Let me connect you with a human agent who can help you better!",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+      });
+      // Auto-connect to human on error
+      Future.delayed(const Duration(seconds: 1), () {
+        _connectToHuman();
+      });
+    }
 
     _scrollToBottom();
   }
 
+  String _getHumanResponse(String message) {
+    // Simulate human agent responses
+    List<String> humanResponses = [
+      "I understand your concern. Let me look into that for you right away.",
+      "Thank you for providing those details. I can definitely help you with that.",
+      "I see what you're asking about. Let me check our system for the most up-to-date information.",
+      "That's a great question! I've helped many customers with similar situations.",
+      "I appreciate your patience. Let me get the exact information you need.",
+    ];
+    
+    // Return a random human-like response
+    return humanResponses[DateTime.now().millisecond % humanResponses.length];
+  }
+
   Future<String> _generateResponse(String message) async {
-    // Convert to lowercase for pattern matching
-    String lowercaseMessage = message.toLowerCase();
-
-    // Delivery status related
-    if (lowercaseMessage.contains('status') || lowercaseMessage.contains('track') || lowercaseMessage.contains('where is')) {
-      return "I can help you track your deliveries! 📦\n\nTo check your delivery status:\n1. Go to your Dashboard\n2. Look for your delivery in the list\n3. Tap on it for real-time tracking\n\nOr tell me your delivery ID and I'll check it for you!";
-    }
-
-    // Creating deliveries
-    if (lowercaseMessage.contains('create') || lowercaseMessage.contains('new delivery') || lowercaseMessage.contains('send')) {
-      return "Creating a new delivery is easy! ✨\n\n1. Tap the 'New Delivery' button on your dashboard\n2. Set pickup and dropoff locations\n3. Add package details\n4. Submit your request\n\nCouriers in your area will be notified immediately!";
-    }
-
-    // Courier related
-    if (lowercaseMessage.contains('courier') || lowercaseMessage.contains('driver') || lowercaseMessage.contains('delivery person')) {
-      return "About our couriers: 🚗\n\n• All couriers are verified and rated\n• You can message them directly during delivery\n• Rate your courier after each delivery\n• View courier location in real-time\n\nNeed to contact your current courier? Check your active delivery for the message option!";
-    }
-
-    // Pricing and billing
-    if (lowercaseMessage.contains('price') || lowercaseMessage.contains('cost') || lowercaseMessage.contains('billing') || lowercaseMessage.contains('payment')) {
-      return "Pricing information: 💰\n\n• Pricing is based on distance and package size\n• You'll see the cost before confirming\n• Multiple payment methods accepted\n• Receipts available in your delivery history\n\nFor specific pricing questions, would you like me to connect you with our billing team?";
-    }
-
-    // Account and profile
-    if (lowercaseMessage.contains('account') || lowercaseMessage.contains('profile') || lowercaseMessage.contains('settings')) {
-      return "Account management: ⚙️\n\nYou can update your:\n• Business information\n• Contact details\n• Notification preferences\n• Payment methods\n\nGo to Profile → Settings to make changes. Need help with something specific?";
-    }
-
-    // Problems or issues
-    if (lowercaseMessage.contains('problem') || lowercaseMessage.contains('issue') || lowercaseMessage.contains('help') || lowercaseMessage.contains('support')) {
-      return "I'm sorry you're experiencing an issue! 😔\n\nI can help with common problems, or if needed, connect you with our human support team.\n\nCould you tell me more about what's happening? For example:\n• Delivery delays\n• App problems\n• Billing issues\n• Courier concerns";
-    }
-
-    // Hours and availability
-    if (lowercaseMessage.contains('hour') || lowercaseMessage.contains('time') || lowercaseMessage.contains('available') || lowercaseMessage.contains('open')) {
-      return "Service availability: 🕐\n\n• Delivery service: 24/7\n• Customer support: 6 AM - 11 PM daily\n• Same-day delivery available\n• Express delivery for urgent items\n\nCouriers set their own availability, so you'll see who's active in your area!";
-    }
-
-    // Cancel or refund
-    if (lowercaseMessage.contains('cancel') || lowercaseMessage.contains('refund') || lowercaseMessage.contains('return')) {
-      return "Cancellations and refunds: 🔄\n\n• Cancel pending deliveries anytime\n• Partial refunds for cancellations after courier assignment\n• Full refund if courier cancels\n• Report issues for case-by-case review\n\nNeed to cancel a specific delivery? I can help with that!";
-    }
-
-    // Greetings
-    if (lowercaseMessage.contains('hello') || lowercaseMessage.contains('hi') || lowercaseMessage.contains('hey')) {
-      return "Hello! 👋 Great to see you again!\n\nHow can I help you with your FETCH deliveries today?";
-    }
-
-    // Thanks
-    if (lowercaseMessage.contains('thank') || lowercaseMessage.contains('thanks')) {
-      return "You're very welcome! 😊\n\nIs there anything else I can help you with today?";
-    }
-
-    // Connect to human
-    if (lowercaseMessage.contains('human') || lowercaseMessage.contains('person') || lowercaseMessage.contains('agent') || lowercaseMessage.contains('representative')) {
-      _connectToHuman();
-      return "I'm connecting you with our customer service team! 👨‍💼\n\nA human agent will be with you shortly. Please wait a moment...";
-    }
-
-    // Default response for unclear queries
-    return "I understand you're asking about \"$message\" 🤔\n\nI can help you with:\n• Delivery tracking and status\n• Creating new deliveries\n• Courier information\n• Account settings\n• Billing questions\n\nCould you be more specific about what you need help with? Or would you like me to connect you with a human agent?";
+    // This method is now replaced by _getAIResponse
+    return await GeminiAIService.getResponse(message);
   }
 
   void _connectToHuman() {
