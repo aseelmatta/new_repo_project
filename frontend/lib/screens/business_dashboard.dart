@@ -4,6 +4,7 @@ import '../models/delivery.dart';
 import '../services/mock_delivery_service.dart';
 import 'business_chat_page.dart';
 import 'business_profile_page.dart';
+import 'delivery_tracking_page.dart';
 
 class BusinessDashboard extends StatefulWidget {
   const BusinessDashboard({super.key});
@@ -19,9 +20,8 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
   bool _showMapView = false;
   String _statusFilter = 'all';
   GoogleMapController? _mapController;
-  int _currentIndex = 0; // For bottom navigation
+  int _currentIndex = 0;
 
-  // Page controller for navigation
   PageController? _pageController;
 
   @override
@@ -112,12 +112,15 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Navigator.pop(context);
-                            setState(() {
-                              _showMapView = true;
-                            });
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DeliveryTrackingPage(delivery: delivery),
+                              ),
+                            );
                           },
                           icon: const Icon(Icons.location_on),
-                          label: const Text('Track Location'),
+                          label: const Text('Track Live'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                           ),
@@ -392,7 +395,6 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                   ],
                 ),
                 
-                // Map preview if both locations are selected
                 if (pickupLocation != null && dropoffLocation != null)
                   Container(
                     margin: const EdgeInsets.symmetric(vertical: 16),
@@ -520,7 +522,6 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
     );
   }
 
-  // Dashboard page content
   Widget _buildDashboardPage() {
     final filteredDeliveries = _deliveries.where((delivery) {
       bool matchesSearch = delivery.pickupAddress.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -539,7 +540,6 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
 
     return Column(
       children: [
-        // Analytics Card
         Card(
           margin: const EdgeInsets.all(8),
           child: Padding(
@@ -580,7 +580,6 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
           ),
         ),
         
-        // Search and Filter
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: Row(
@@ -613,7 +612,6 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
           ),
         ),
         
-        // Toggle buttons
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
           child: Row(
@@ -635,7 +633,6 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
           ),
         ),
         
-        // Content
         Expanded(
           child: _showMapView
               ? GoogleMap(
@@ -722,18 +719,9 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
         currentIndex: _currentIndex,
         onTap: _onNavigationTap,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard), 
-            label: 'Dashboard'
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble), 
-            label: 'Support'
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person), 
-            label: 'Profile'
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'Support'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );
