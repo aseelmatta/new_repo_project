@@ -5,6 +5,7 @@ from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, firestore
 from models import Order, Carrier, Business
+from auth import require_token
 
 app = Flask(__name__)
 CORS(app)  # allow cross‐origin requests (useful during development)
@@ -14,12 +15,125 @@ cred = credentials.Certificate('firebase_admin.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"success": True, "status": "ok"}), 200
+
+#-----------------------
+# PROFILE ENDPOINTS
+#-----------------------
+@app.route('/createUserProfile', methods=['POST'])
+@require_token
+def create_user_profile():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
+
+        # Expected fields in JSON: role (required), displayName (optional), phone (optional)
+        role = data.get('role')
+        display_name = data.get('displayName')
+        phone = data.get('phone')
+
+        if role not in ('business', 'courier'):
+            return jsonify({'success': False, 'error': 'Invalid or missing role'}), 400
+
+        # Get the authenticated user's UID:
+        uid = request.uid
+        #uid = 'TEST_UID'   # same dummy ID
+        # Also you can grab email from token if you like: decoded token’s "email"
+        # But for simplicity, let’s store whatever Flutter passes:
+        email = data.get('email')  # optional
+
+        user_doc_ref = db.collection('users').document(uid)
+        # Check if profile already exists
+        if user_doc_ref.get().exists:
+            return jsonify({'success': False, 'error': 'Profile already exists'}), 400
+
+        # Build the profile dict
+        profile = {
+            'role': role,
+        }
+        if display_name:
+            profile['displayName'] = display_name
+        if email:
+            profile['email'] = email
+        if phone:
+            profile['phone'] = phone
+
+        # Save to Firestore
+        user_doc_ref.set(profile)
+
+        return jsonify({'success': True}), 201
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/getUserProfile', methods=['GET'])
+@require_token
+def get_user_profile():
+    try:
+        uid = request.uid
+        #uid = 'TEST_UID'   # same dummy ID
+
+        user_doc = db.collection('users').document(uid).get()
+        if not user_doc.exists:
+            return jsonify({'success': False, 'error': 'Profile not found'}), 404
+
+        data = user_doc.to_dict()
+        # Always include the uid so client knows who it is
+        data['uid'] = uid
+
+        return jsonify({'success': True, 'profile': data}), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/updateUserProfile', methods=['PUT'])
+@require_token
+def update_user_profile():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
+
+        uid = request.uid
+       # uid = 'TEST_UID'   # same dummy ID
+        user_doc_ref = db.collection('users').document(uid)
+        if not user_doc_ref.get().exists:
+            return jsonify({'success': False, 'error': 'Profile not found'}), 404
+
+        updates = {}
+        if 'displayName' in data:
+            updates['displayName'] = data['displayName']
+        if 'phone' in data:
+            updates['phone'] = data['phone']
+        if 'role' in data:
+            # Allow changing role only if it’s valid
+            if data['role'] not in ('business', 'courier'):
+                return jsonify({'success': False, 'error': 'Invalid role'}), 400
+            updates['role'] = data['role']
+        # You can also allow updating email if you like:
+        if 'email' in data:
+            updates['email'] = data['email']
+
+        if not updates:
+            return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
+
+        user_doc_ref.update(updates)
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # ------------------------
 # ORDERS ENDPOINTS
 # ------------------------
 
 @app.route('/getOrders', methods=['GET'])
+@require_token
 def get_orders():
     try:
         orders_ref = db.collection('orders')
@@ -37,6 +151,7 @@ def get_orders():
 
 
 @app.route('/getOrder/<order_id>', methods=['GET'])
+@require_token
 def get_order(order_id):
     try:
         doc_ref = db.collection('orders').document(order_id)
@@ -52,6 +167,7 @@ def get_order(order_id):
 
 
 @app.route('/createOrder', methods=['POST'])
+@require_token
 def create_order():
     try:
         data = request.get_json()
@@ -83,6 +199,7 @@ def create_order():
 
 
 @app.route('/updateOrder/<order_id>', methods=['PUT'])
+@require_token
 def update_order(order_id):
     try:
         data = request.get_json()
@@ -117,6 +234,7 @@ def update_order(order_id):
 
 
 @app.route('/deleteOrder/<order_id>', methods=['DELETE'])
+@require_token
 def delete_order(order_id):
     try:
         doc_ref = db.collection('orders').document(order_id)
@@ -135,6 +253,7 @@ def delete_order(order_id):
 # ------------------------
 
 @app.route('/getCarriers', methods=['GET'])
+@require_token
 def get_carriers():
     try:
         carriers_ref = db.collection('carriers')
@@ -150,6 +269,7 @@ def get_carriers():
 
 
 @app.route('/getCarrier/<carrier_id>', methods=['GET'])
+@require_token
 def get_carrier(carrier_id):
     try:
         doc_ref = db.collection('carriers').document(carrier_id)
@@ -165,6 +285,7 @@ def get_carrier(carrier_id):
 
 
 @app.route('/createCarrier', methods=['POST'])
+@require_token
 def create_carrier():
     try:
         data = request.get_json()
@@ -187,6 +308,7 @@ def create_carrier():
 
 
 @app.route('/updateCarrier/<carrier_id>', methods=['PUT'])
+@require_token
 def update_carrier(carrier_id):
     try:
         data = request.get_json()
@@ -217,6 +339,7 @@ def update_carrier(carrier_id):
 
 
 @app.route('/deleteCarrier/<carrier_id>', methods=['DELETE'])
+@require_token
 def delete_carrier(carrier_id):
     try:
         doc_ref = db.collection('carriers').document(carrier_id)
@@ -235,6 +358,7 @@ def delete_carrier(carrier_id):
 # ------------------------
 
 @app.route('/getBusinesses', methods=['GET'])
+@require_token
 def get_businesses():
     try:
         businesses_ref = db.collection('businesses')
@@ -250,6 +374,7 @@ def get_businesses():
 
 
 @app.route('/getBusiness/<business_id>', methods=['GET'])
+@require_token
 def get_business(business_id):
     try:
         doc_ref = db.collection('businesses').document(business_id)
@@ -265,6 +390,7 @@ def get_business(business_id):
 
 
 @app.route('/createBusiness', methods=['POST'])
+@require_token
 def create_business():
     try:
         data = request.get_json()
@@ -287,6 +413,7 @@ def create_business():
 
 
 @app.route('/updateBusiness/<business_id>', methods=['PUT'])
+@require_token
 def update_business(business_id):
     try:
         data = request.get_json()
@@ -317,6 +444,7 @@ def update_business(business_id):
 
 
 @app.route('/deleteBusiness/<business_id>', methods=['DELETE'])
+@require_token
 def delete_business(business_id):
     try:
         doc_ref = db.collection('businesses').document(business_id)
