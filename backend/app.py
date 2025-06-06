@@ -2,19 +2,17 @@
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import firebase_admin
-from firebase_admin import credentials, firestore
+
 from models import Order, Carrier, Business
 from auth import require_token
 
+from firebase_init import db
+from google.cloud import firestore
+
+from tasks.delivery_tasks import match_and_assign_courier
+
 app = Flask(__name__)
 CORS(app)  # allow cross‐origin requests (useful during development)
-
-# 1. Initialize Firebase Admin SDK
-cred = credentials.Certificate('firebase_admin.json')
-firebase_admin.initialize_app(cred)
-db = firestore.client()
-
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"success": True, "status": "ok"}), 200
@@ -23,7 +21,7 @@ def health():
 # PROFILE ENDPOINTS
 #-----------------------
 @app.route('/createUserProfile', methods=['POST'])
-@require_token
+#@require_token
 def create_user_profile():
     try:
         data = request.get_json()
@@ -71,7 +69,7 @@ def create_user_profile():
 
 
 @app.route('/getUserProfile', methods=['GET'])
-@require_token
+#@require_token
 def get_user_profile():
     try:
         uid = request.uid
@@ -91,7 +89,7 @@ def get_user_profile():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/updateUserProfile', methods=['PUT'])
-@require_token
+##@require_token
 def update_user_profile():
     try:
         data = request.get_json()
@@ -133,7 +131,7 @@ def update_user_profile():
 # ------------------------
 
 @app.route('/getOrders', methods=['GET'])
-@require_token
+#@require_token
 def get_orders():
     try:
         orders_ref = db.collection('orders')
@@ -151,7 +149,7 @@ def get_orders():
 
 
 @app.route('/getOrder/<order_id>', methods=['GET'])
-@require_token
+#@require_token
 def get_order(order_id):
     try:
         doc_ref = db.collection('orders').document(order_id)
@@ -167,7 +165,7 @@ def get_order(order_id):
 
 
 @app.route('/createOrder', methods=['POST'])
-@require_token
+#@require_token
 def create_order():
     try:
         data = request.get_json()
@@ -199,7 +197,7 @@ def create_order():
 
 
 @app.route('/updateOrder/<order_id>', methods=['PUT'])
-@require_token
+#@require_token
 def update_order(order_id):
     try:
         data = request.get_json()
@@ -234,7 +232,7 @@ def update_order(order_id):
 
 
 @app.route('/deleteOrder/<order_id>', methods=['DELETE'])
-@require_token
+#@require_token
 def delete_order(order_id):
     try:
         doc_ref = db.collection('orders').document(order_id)
@@ -253,7 +251,7 @@ def delete_order(order_id):
 # ------------------------
 
 @app.route('/getCarriers', methods=['GET'])
-@require_token
+#@require_token
 def get_carriers():
     try:
         carriers_ref = db.collection('carriers')
@@ -269,7 +267,7 @@ def get_carriers():
 
 
 @app.route('/getCarrier/<carrier_id>', methods=['GET'])
-@require_token
+#@require_token
 def get_carrier(carrier_id):
     try:
         doc_ref = db.collection('carriers').document(carrier_id)
@@ -285,7 +283,7 @@ def get_carrier(carrier_id):
 
 
 @app.route('/createCarrier', methods=['POST'])
-@require_token
+#@require_token
 def create_carrier():
     try:
         data = request.get_json()
@@ -308,7 +306,7 @@ def create_carrier():
 
 
 @app.route('/updateCarrier/<carrier_id>', methods=['PUT'])
-@require_token
+#@require_token
 def update_carrier(carrier_id):
     try:
         data = request.get_json()
@@ -339,7 +337,7 @@ def update_carrier(carrier_id):
 
 
 @app.route('/deleteCarrier/<carrier_id>', methods=['DELETE'])
-@require_token
+#@require_token
 def delete_carrier(carrier_id):
     try:
         doc_ref = db.collection('carriers').document(carrier_id)
@@ -358,7 +356,7 @@ def delete_carrier(carrier_id):
 # ------------------------
 
 @app.route('/getBusinesses', methods=['GET'])
-@require_token
+#@require_token
 def get_businesses():
     try:
         businesses_ref = db.collection('businesses')
@@ -374,7 +372,7 @@ def get_businesses():
 
 
 @app.route('/getBusiness/<business_id>', methods=['GET'])
-@require_token
+#@require_token
 def get_business(business_id):
     try:
         doc_ref = db.collection('businesses').document(business_id)
@@ -390,7 +388,7 @@ def get_business(business_id):
 
 
 @app.route('/createBusiness', methods=['POST'])
-@require_token
+#@require_token
 def create_business():
     try:
         data = request.get_json()
@@ -413,7 +411,7 @@ def create_business():
 
 
 @app.route('/updateBusiness/<business_id>', methods=['PUT'])
-@require_token
+#@require_token
 def update_business(business_id):
     try:
         data = request.get_json()
@@ -444,7 +442,7 @@ def update_business(business_id):
 
 
 @app.route('/deleteBusiness/<business_id>', methods=['DELETE'])
-@require_token
+#@require_token
 def delete_business(business_id):
     try:
         doc_ref = db.collection('businesses').document(business_id)
@@ -452,6 +450,164 @@ def delete_business(business_id):
             return jsonify({'success': False, 'error': 'Business not found'}), 404
 
         doc_ref.delete()
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
+# === DELIVERY ROUTES START HERE ===
+
+@app.route('/updateLocation', methods=['PUT'])
+#@require_token
+def update_location():
+    data = request.get_json() or {}
+    lat = data.get('lat')
+    lng = data.get('lng')
+    if lat is None or lng is None:
+        return jsonify({'success': False, 'error': 'Missing lat or lng'}), 400
+
+    uid = 'test_uid'
+    #uid = request.uid
+    db.collection('courier_locations').document(uid).set({
+        'lat': lat,
+        'lng': lng,
+        'timestamp': firestore.SERVER_TIMESTAMP
+    })
+    return jsonify({'success': True}), 200
+
+
+@app.route('/createDelivery', methods=['POST'])
+#@require_token
+def create_delivery():
+    data = request.get_json() or {}
+    pickup = data.get('pickupLocation')
+    dropoff = data.get('dropoffLocation')
+    recipient_name = data.get('recipientName')
+    recipient_phone = data.get('recipientPhone')
+    instructions = data.get('instructions', "")
+
+    if not pickup or 'lat' not in pickup or 'lng' not in pickup:
+        return jsonify({'success': False, 'error': 'Missing pickupLocation'}), 400
+    if not dropoff or 'lat' not in dropoff or 'lng' not in dropoff:
+        return jsonify({'success': False, 'error': 'Missing dropoffLocation'}), 400
+    if not recipient_name:
+        return jsonify({'success': False, 'error': 'Missing recipientName'}), 400
+    if not recipient_phone:
+        return jsonify({'success': False, 'error': 'Missing recipientPhone'}), 400
+
+    #uid = request.uid
+    uid = 'test_uid'
+    delivery_data = {
+        'pickupLocation': {'lat': pickup['lat'], 'lng': pickup['lng']},
+        'dropoffLocation': {'lat': dropoff['lat'], 'lng': dropoff['lng']},
+        'recipientName': recipient_name,
+        'recipientPhone': recipient_phone,
+        'instructions': instructions,
+        'status': 'pending',
+        'createdBy': uid,
+        'assignedCourier': None,
+        'timestampCreated': firestore.SERVER_TIMESTAMP,
+        'timestampUpdated': firestore.SERVER_TIMESTAMP
+    }
+    doc_ref = db.collection('deliveries').add(delivery_data)[1]
+    delivery_id = doc_ref.id
+
+    # Enqueue the background task that finds & assigns the nearest courier
+    match_and_assign_courier.delay(delivery_id)
+
+    return jsonify({'success': True, 'delivery_id': delivery_id}), 201
+
+
+@app.route('/getDeliveries', methods=['GET'])
+@require_token
+def get_deliveries():
+    """
+    Returns a list of deliveries:
+      - If the user’s role is “business”, returns deliveries where createdBy == uid
+      - If the user’s role is “courier”, returns deliveries where assignedCourier == uid
+    """
+    try:
+        uid = request.uid
+        # 1) Fetch this user’s profile to know their role
+        user_doc = db.collection('users').document(uid).get()
+        if not user_doc.exists:
+            return jsonify({'success': False, 'error': 'Profile not found'}), 404
+
+        profile = user_doc.to_dict()
+        role = profile.get('role')
+
+        if role == 'business':
+            # Query deliveries created by this business
+            query = db.collection('deliveries').where('createdBy', '==', uid)
+        elif role == 'courier':
+            # Query deliveries assigned to this courier
+            query = db.collection('deliveries').where('assignedCourier', '==', uid)
+        else:
+            return jsonify({'success': False, 'error': 'Invalid role'}), 400
+
+        docs = query.stream()
+
+        deliveries = []
+        for doc in docs:
+            data = doc.to_dict()
+            # Include the doc ID on each record
+            deliveries.append({'id': doc.id, **data})
+
+        return jsonify({'success': True, 'deliveries': deliveries}), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/getDelivery/<delivery_id>', methods=['GET'])
+@require_token
+def get_delivery(delivery_id):
+    """
+    Return the delivery document with ID == delivery_id.
+    """
+    try:
+        doc_ref = db.collection('deliveries').document(delivery_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({'success': False, 'error': 'Delivery not found'}), 404
+
+        data = doc.to_dict()
+        return jsonify({'success': True, 'delivery': {'id': doc.id, **data}}), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+@app.route('/updateDeliveryStatus/<delivery_id>', methods=['PUT'])
+@require_token
+def update_delivery_status(delivery_id):
+    """
+    Allows the assigned courier to update the status of their delivery.
+    Expected JSON body: { "status": "<newStatus>" }
+    """
+    try:
+        data = request.get_json() or {}
+        new_status = data.get('status')
+        if not new_status:
+            return jsonify({'success': False, 'error': 'Missing status field'}), 400
+
+        uid = request.uid
+        # 1) Verify the delivery exists and that this user is actually the assigned courier
+        doc_ref = db.collection('deliveries').document(delivery_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return jsonify({'success': False, 'error': 'Delivery not found'}), 404
+
+        delivery = doc.to_dict()
+        assigned = delivery.get('assignedCourier')
+        if assigned != uid:
+            return jsonify({'success': False, 'error': 'Forbidden—You are not assigned to this delivery'}), 403
+
+        # 2) Update the status field and timestampUpdated
+        doc_ref.update({
+            'status': new_status,
+            'timestampUpdated': firestore.SERVER_TIMESTAMP
+        })
         return jsonify({'success': True}), 200
 
     except Exception as e:
