@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
-import 'screens/welcome_page.dart';
-import 'screens/courier_dashboard.dart';
-import 'screens/business_dashboard.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'services/auth_service.dart';
+import 'services/gemini_ai_service.dart';
+import 'screens/welcome_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  
+  // Initialize services
   await AuthService.initialize();
+  await GeminiAIService.initialize();
+  
   runApp(const MyApp());
 }
 
@@ -16,38 +23,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Courier Management System',
+      title: 'FETCH - Delivery Management',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: FutureBuilder<String?>(
-        future: AuthService.getUserRole(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          } else if (snapshot.hasError) {
-            return const WelcomePage();
-          } else {
-            final userRole = snapshot.data;
-            if (userRole == null) {
-              //return const BusinessDashboard();
-              return const WelcomePage();
-            } else if (userRole == 'courier') {
-              return const CourierDashboard();
-            } else if (userRole == 'business') {
-              return const BusinessDashboard();
-            } else {
-              // Handle unexpected role or error
-              return const WelcomePage();
-            }
-          }
-        },
-      ),
+      home: const WelcomePage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }

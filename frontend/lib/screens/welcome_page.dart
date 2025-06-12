@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../widgets/terms_and_privacy_dialogs.dart';
 import 'account_setup_page.dart';
@@ -20,11 +15,7 @@ class WelcomePage extends StatefulWidget {
 }
 
 class _WelcomePageState extends State<WelcomePage> {
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
   bool _isLoading = false;
-  
-  // Your backend API base URL
-  static const String API_BASE_URL = 'https://your-api-url.com/api'; // Replace with your actual API URL
 
   @override
   void initState() {
@@ -35,21 +26,12 @@ class _WelcomePageState extends State<WelcomePage> {
   // Check if user already has a valid session
   Future<void> _checkExistingSession() async {
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('auth_token');
-      
-      if (token != null) {
-        // Verify token with your backend
-        bool isValid = await _verifyToken(token);
-        if (isValid) {
-          // Get user data and navigate appropriately
-          Map<String, dynamic>? userData = await _getUserData(token);
-          if (userData != null) {
-            _handleAuthenticatedUser(userData);
-          }
-        } else {
-          // Token is invalid, clear it
-          await prefs.remove('auth_token');
+      bool isAuthenticated = await AuthService.isAuthenticated();
+      if (isAuthenticated) {
+        // Get user profile to check if setup is complete
+        Map<String, dynamic>? profile = await AuthService.getUserProfile();
+        if (profile != null) {
+          _handleAuthenticatedUser(profile);
         }
       }
     } catch (e) {
@@ -57,61 +39,22 @@ class _WelcomePageState extends State<WelcomePage> {
     }
   }
 
-  // Verify token with your backend
-  Future<bool> _verifyToken(String token) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$API_BASE_URL/auth/verify'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      return response.statusCode == 200;
-    } catch (e) {
-      print('Token verification error: $e');
-      return false;
-    }
-  }
-
-  // Get user data from your backend
-  Future<Map<String, dynamic>?> _getUserData(String token) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$API_BASE_URL/user/profile'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      }
-    } catch (e) {
-      print('Get user data error: $e');
-    }
-    return null;
-  }
-
   // Handle authenticated user - check if setup is complete
   void _handleAuthenticatedUser(Map<String, dynamic> userData) {
-    // Check if user has completed onboarding
-    bool hasCompletedSetup = userData['setup_completed'] ?? false;
+    // Check if user has completed role setup
+    String? userRole = userData['role'];
     
-    if (hasCompletedSetup) {
-      // Navigate to appropriate dashboard based on role
-      String userRole = userData['role'] ?? 'business';
+    if (userRole != null) {
+      // User has completed setup, navigate to appropriate dashboard
       _navigateToDashboard(userRole);
     } else {
-      // Navigate to account setup for first-time users
+      // User needs to complete setup
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => AccountSetupPage(
             email: userData['email'],
-            displayName: userData['display_name'] ?? '${userData['first_name'] ?? ''} ${userData['last_name'] ?? ''}',
+            displayName: userData['displayName'] ?? '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}',
           ),
         ),
       );
@@ -126,12 +69,7 @@ class _WelcomePageState extends State<WelcomePage> {
         dashboard = const BusinessDashboard();
         break;
       case 'courier':
-        // dashboard = const CourierDashboard();
-        dashboard = const BusinessDashboard(); // Temporary fallback
-        break;
-      case 'admin':
-        // dashboard = const AdminDashboard();
-        dashboard = const BusinessDashboard(); // Temporary fallback
+        dashboard = const CourierDashboard();
         break;
       default:
         dashboard = const BusinessDashboard();
@@ -151,44 +89,31 @@ class _WelcomePageState extends State<WelcomePage> {
     });
 
     try {
-      // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      AuthResult result = await AuthService.signInWithGoogle();
       
-      if (googleUser == null) {
-        // User cancelled the sign-in
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // Get the authentication details
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
-      // Send the token to your backend for verification
-      final response = await http.post(
-        Uri.parse('$API_BASE_URL/auth/google'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'access_token': googleAuth.accessToken,
-          'id_token': googleAuth.idToken,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
+      if (result.success) {
+        print('Google sign in successful: ${result.userData?['email']}');
         
-        // Save the JWT token from your backend
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', responseData['token']);
+        // Check if user has profile setup
+        Map<String, dynamic>? profile = await AuthService.getUserProfile();
         
-        print('Google sign in successful: ${responseData['user']['email']}');
-        _handleAuthenticatedUser(responseData['user']);
+        if (profile != null && profile['role'] != null) {
+          // User has completed setup
+          _navigateToDashboard(profile['role']);
+        } else {
+          // New user or incomplete setup - go to account setup
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AccountSetupPage(
+                email: result.userData?['email'],
+                displayName: result.userData?['displayName'],
+              ),
+            ),
+          );
+        }
       } else {
-        final errorData = json.decode(response.body);
-        _showErrorDialog('Google Sign In Failed', errorData['message'] ?? 'Authentication failed');
+        _showErrorDialog('Google Sign In Failed', result.error ?? 'Authentication failed');
       }
     } catch (e) {
       print('Google sign in error: $e');
@@ -207,48 +132,31 @@ class _WelcomePageState extends State<WelcomePage> {
     });
 
     try {
-      // Trigger the sign-in flow
-      final LoginResult result = await FacebookAuth.instance.login();
-
-      if (result.status == LoginStatus.success) {
-        // Send the Facebook access token to your backend
-        final response = await http.post(
-          Uri.parse('$API_BASE_URL/auth/facebook'),
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: json.encode({
-            'access_token': result.accessToken!.tokenString,
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          final responseData = json.decode(response.body);
-          
-          // Save the JWT token from your backend
-          SharedPreferences prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', responseData['token']);
-          
-          print('Facebook sign in successful: ${responseData['user']['email']}');
-          _handleAuthenticatedUser(responseData['user']);
+      AuthResult result = await AuthService.signInWithFacebook();
+      
+      if (result.success) {
+        print('Facebook sign in successful: ${result.userData?['email']}');
+        
+        // Check if user has profile setup
+        Map<String, dynamic>? profile = await AuthService.getUserProfile();
+        
+        if (profile != null && profile['role'] != null) {
+          // User has completed setup
+          _navigateToDashboard(profile['role']);
         } else {
-          final errorData = json.decode(response.body);
-          _showErrorDialog('Facebook Sign In Failed', errorData['message'] ?? 'Authentication failed');
+          // New user or incomplete setup - go to account setup
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AccountSetupPage(
+                email: result.userData?['email'],
+                displayName: result.userData?['displayName'],
+              ),
+            ),
+          );
         }
       } else {
-        print('Facebook sign in failed: ${result.status}');
-        String errorMessage = '';
-        switch (result.status) {
-          case LoginStatus.cancelled:
-            errorMessage = 'Login was cancelled';
-            break;
-          case LoginStatus.failed:
-            errorMessage = 'Login failed. Please try again.';
-            break;
-          default:
-            errorMessage = 'An unexpected error occurred';
-        }
-        _showErrorDialog('Facebook Sign In Failed', errorMessage);
+        _showErrorDialog('Facebook Sign In Failed', result.error ?? 'Authentication failed');
       }
     } catch (e) {
       print('Facebook sign in error: $e');
@@ -302,30 +210,16 @@ class _WelcomePageState extends State<WelcomePage> {
                   ),
                 ),
                 Text(
-                  'FETCHI', 
+                  'FETCH', 
                   style: GoogleFonts.inter(
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
                     color: Colors.pink,
                   ),
                 ),
-                // In your welcome_page.dart, you can add temporary mock buttons:
-ElevatedButton(
-  onPressed: () {
-    // Navigate directly to account setup for testing
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AccountSetupPage(
-          email: 'test@example.com',
-          displayName: 'Test User',
-        ),
-      ),
-    );
-  },
-  child: const Text('Test Flow (Skip Auth)'),
-),
+                
                 const SizedBox(height: 48),
+                
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
@@ -375,7 +269,42 @@ ElevatedButton(
                     ],
                   ),
                 ),
+                
                 const SizedBox(height: 24),
+                
+                // Development/Testing buttons (remove in production)
+                if (const bool.fromEnvironment('dart.vm.product') == false) ...[
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Development Testing:',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AccountSetupPage(
+                            email: 'test@example.com',
+                            displayName: 'Test User',
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[300],
+                    ),
+                    child: const Text('Skip Auth (Testing)'),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                
                 RichText(
                   textAlign: TextAlign.center,
                   text: TextSpan(
