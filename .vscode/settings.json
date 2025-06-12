@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/Users/zena4/Desktop/ParallelProj/parallel_prog_proj_cursor_repo/parallel_algo_project/frontend/windows/flutter"
+    "cmake.sourceDirectory": "C:/Users/zena4/Desktop/ParallelProj/parallel_prog_proj_cursor_repo/parallel_algo_project/frontend/windows/flutter",
+    "cmake.ignoreCMakeListsMissing": true
 }

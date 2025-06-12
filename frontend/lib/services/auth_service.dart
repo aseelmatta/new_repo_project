@@ -1,91 +1,209 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 class AuthService {
-  static const String API_BASE_URL = 'https://your-api-url.com/api'; // Replace with your actual API URL
+  // Update this with your actual backend URL
+  static const String API_BASE_URL = 'http://10.0.2.2:5001'; // For Android emulator
+  // static const String API_BASE_URL = 'http://127.0.0.1:5001'; // For iOS simulator
+  // static const String API_BASE_URL = 'https://your-deployed-backend.com'; // For production
   
   static String? _userRole;
   static String? _token;
+  static String? _uid;
+
+  // Firebase Auth instance
+  static final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  static final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   static Future<void> initialize() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('auth_token');
+    _uid = prefs.getString('user_uid');
     
     if (_token != null) {
-      try {
-        final response = await http.get(
-          Uri.parse('$API_BASE_URL/auth/verify'),
-          headers: {
-            'Authorization': 'Bearer $_token',
-            'Content-Type': 'application/json',
-          },
-        );
-
-        if (response.statusCode != 200) {
-          // Token is invalid, clear it
-          await prefs.remove('auth_token');
-          _token = null;
-          _userRole = null;
-        }
-      } catch (e) {
-        print('Token verification error: $e');
-        _token = null;
-        _userRole = null;
+      // Verify token with backend
+      bool isValid = await verifyToken(_token!);
+      if (!isValid) {
+        await clearToken();
       }
     }
   }
 
-  static Future<String?> getUserRole() async {
-    if (_token == null) return null;
-    
+  // Google Sign In
+  static Future<AuthResult> signInWithGoogle() async {
     try {
-      final response = await http.get(
-        Uri.parse('$API_BASE_URL/user/profile'),
-        headers: {
-          'Authorization': 'Bearer $_token',
-          'Content-Type': 'application/json',
-        },
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        return AuthResult(success: false, error: 'Google sign in was cancelled');
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      // Create Firebase credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase
+      final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final User? user = userCredential.user;
+      
+      if (user == null) {
+        return AuthResult(success: false, error: 'Failed to sign in with Google');
+      }
+
+      // Get Firebase ID token
+      final String? idToken = await user.getIdToken();
+      
+      // Send to backend for verification and user creation
+      final response = await http.post(
+        Uri.parse('$API_BASE_URL/auth/google'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'access_token': googleAuth.accessToken,
+          'id_token': idToken,
+        }),
       );
 
       if (response.statusCode == 200) {
-        final userData = json.decode(response.body);
-        _userRole = userData['role'];
-        return _userRole;
+        final responseData = json.decode(response.body);
+        
+        // Save tokens
+        await saveToken(idToken!);
+        await saveUid(user.uid);
+        
+        return AuthResult(
+          success: true,
+          userData: {
+            'uid': user.uid,
+            'email': user.email,
+            'displayName': user.displayName,
+            'photoURL': user.photoURL,
+          },
+          token: idToken,
+        );
+      } else {
+        return AuthResult(success: false, error: 'Backend authentication failed');
       }
     } catch (e) {
-      print('Get user role error: $e');
+      print('Google sign in error: $e');
+      return AuthResult(success: false, error: 'Google sign in failed: $e');
     }
-    return null;
   }
 
-  static Future<void> setUserRole(String role) async {
-    _userRole = role;
+  // Facebook Sign In
+  static Future<AuthResult> signInWithFacebook() async {
+    try {
+      final LoginResult result = await FacebookAuth.instance.login();
+      
+      if (result.status != LoginStatus.success) {
+        return AuthResult(success: false, error: 'Facebook login failed');
+      }
+
+      final AccessToken accessToken = result.accessToken!;
+      
+      // Create Firebase credential
+      final credential = FacebookAuthProvider.credential(accessToken.tokenString);
+      
+      // Sign in to Firebase
+      final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final User? user = userCredential.user;
+      
+      if (user == null) {
+        return AuthResult(success: false, error: 'Failed to sign in with Facebook');
+      }
+
+      // Get Firebase ID token
+      final String? idToken = await user.getIdToken();
+      
+      // Send to backend
+      final response = await http.post(
+        Uri.parse('$API_BASE_URL/auth/facebook'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'access_token': accessToken.tokenString,
+          'id_token': idToken,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        await saveToken(idToken!);
+        await saveUid(user.uid);
+        
+        return AuthResult(
+          success: true,
+          userData: {
+            'uid': user.uid,
+            'email': user.email,
+            'displayName': user.displayName,
+            'photoURL': user.photoURL,
+          },
+          token: idToken,
+        );
+      } else {
+        return AuthResult(success: false, error: 'Backend authentication failed');
+      }
+    } catch (e) {
+      print('Facebook sign in error: $e');
+      return AuthResult(success: false, error: 'Facebook sign in failed: $e');
+    }
   }
-  
+
   // Save authentication token
   static Future<void> saveToken(String token) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
+    _token = token;
+  }
+  
+  // Save user UID
+  static Future<void> saveUid(String uid) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_uid', uid);
+    _uid = uid;
   }
   
   // Get stored authentication token
   static Future<String?> getToken() async {
+    if (_token != null) return _token;
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
+    _token = prefs.getString('auth_token');
+    return _token;
   }
   
-  // Clear authentication token (logout)
+  // Get stored UID
+  static Future<String?> getUid() async {
+    if (_uid != null) return _uid;
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _uid = prefs.getString('user_uid');
+    return _uid;
+  }
+  
+  // Clear authentication data (logout)
   static Future<void> clearToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove('user_uid');
+    _token = null;
+    _uid = null;
+    _userRole = null;
+    
+    // Sign out from Firebase and social providers
+    await _firebaseAuth.signOut();
+    await _googleSignIn.signOut();
+    await FacebookAuth.instance.logOut();
   }
   
   // Verify token with backend
   static Future<bool> verifyToken(String token) async {
     try {
       final response = await http.get(
-        Uri.parse('$API_BASE_URL/auth/verify'),
+        Uri.parse('$API_BASE_URL/health'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -99,6 +217,35 @@ class AuthService {
     }
   }
   
+  // Create user profile (after role selection)
+  static Future<bool> createUserProfile(Map<String, dynamic> userData) async {
+    try {
+      String? token = await getToken();
+      if (token == null) return false;
+      
+      final response = await http.post(
+        Uri.parse('$API_BASE_URL/createUserProfile'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(userData),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          _userRole = userData['role'];
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      print('Create user profile error: $e');
+      return false;
+    }
+  }
+  
   // Get user profile from backend
   static Future<Map<String, dynamic>?> getUserProfile() async {
     try {
@@ -106,7 +253,7 @@ class AuthService {
       if (token == null) return null;
       
       final response = await http.get(
-        Uri.parse('$API_BASE_URL/user/profile'),
+        Uri.parse('$API_BASE_URL/getUserProfile'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -114,113 +261,18 @@ class AuthService {
       );
 
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          _userRole = responseData['profile']['role'];
+          return responseData['profile'];
+        }
       }
     } catch (e) {
       print('Get user profile error: $e');
     }
     return null;
   }
-  
-  // Google authentication
-  static Future<AuthResult> authenticateWithGoogle(String accessToken, String idToken) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$API_BASE_URL/auth/google'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'access_token': accessToken,
-          'id_token': idToken,
-        }),
-      );
 
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        await saveToken(responseData['token']);
-        
-        return AuthResult(
-          success: true,
-          userData: responseData['user'],
-          token: responseData['token'],
-        );
-      } else {
-        final errorData = json.decode(response.body);
-        return AuthResult(
-          success: false,
-          error: errorData['message'] ?? 'Authentication failed',
-        );
-      }
-    } catch (e) {
-      print('Google authentication error: $e');
-      return AuthResult(
-        success: false,
-        error: 'Network error. Please check your connection.',
-      );
-    }
-  }
-  
-  // Facebook authentication
-  static Future<AuthResult> authenticateWithFacebook(String accessToken) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$API_BASE_URL/auth/facebook'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'access_token': accessToken,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        await saveToken(responseData['token']);
-        
-        return AuthResult(
-          success: true,
-          userData: responseData['user'],
-          token: responseData['token'],
-        );
-      } else {
-        final errorData = json.decode(response.body);
-        return AuthResult(
-          success: false,
-          error: errorData['message'] ?? 'Authentication failed',
-        );
-      }
-    } catch (e) {
-      print('Facebook authentication error: $e');
-      return AuthResult(
-        success: false,
-        error: 'Network error. Please check your connection.',
-      );
-    }
-  }
-  
-  // Create user profile (after account setup)
-  static Future<bool> createUserProfile(Map<String, dynamic> userData) async {
-    try {
-      String? token = await getToken();
-      if (token == null) return false;
-      
-      final response = await http.post(
-        Uri.parse('$API_BASE_URL/user/profile'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(userData),
-      );
-
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (e) {
-      print('Create user profile error: $e');
-      return false;
-    }
-  }
-  
   // Update user profile
   static Future<bool> updateUserProfile(Map<String, dynamic> userData) async {
     try {
@@ -228,7 +280,7 @@ class AuthService {
       if (token == null) return false;
       
       final response = await http.put(
-        Uri.parse('$API_BASE_URL/user/profile'),
+        Uri.parse('$API_BASE_URL/updateUserProfile'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -236,11 +288,34 @@ class AuthService {
         body: json.encode(userData),
       );
 
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        return responseData['success'] == true;
+      }
+      return false;
     } catch (e) {
       print('Update user profile error: $e');
       return false;
     }
+  }
+  
+  // Get current user role
+  static Future<String?> getUserRole() async {
+    if (_userRole != null) return _userRole;
+    
+    final profile = await getUserProfile();
+    if (profile != null) {
+      _userRole = profile['role'];
+      return _userRole;
+    }
+    return null;
+  }
+  
+  // Check if user is authenticated
+  static Future<bool> isAuthenticated() async {
+    String? token = await getToken();
+    if (token == null) return false;
+    return await verifyToken(token);
   }
   
   // Logout
@@ -248,9 +323,9 @@ class AuthService {
     try {
       String? token = await getToken();
       if (token != null) {
-        // Optional: Call backend logout endpoint
+        // Optional: Call backend logout endpoint if you implement one
         await http.post(
-          Uri.parse('$API_BASE_URL/auth/logout'),
+          Uri.parse('$API_BASE_URL/logout'),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',

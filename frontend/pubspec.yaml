@@ -14,9 +14,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   google_generative_ai: ^0.4.3 
   # Firebase
-  firebase_core: ^2.24.0
-  firebase_auth: ^4.15.0
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
   cloud_firestore: ^4.13.3
+  
   
   # Maps and Location
   google_maps_flutter: ^2.5.0
