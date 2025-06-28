@@ -530,6 +530,7 @@ def update_location():
     return jsonify({'success': True}), 200
 
 
+
 @app.route('/createDelivery', methods=['POST'])
 @require_token
 def create_delivery():
@@ -548,9 +549,18 @@ def create_delivery():
         return jsonify({'success': False, 'error': 'Missing recipientName'}), 400
     if not recipient_phone:
         return jsonify({'success': False, 'error': 'Missing recipientPhone'}), 400
-
+    
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371  # km
+        dlat = radians(lat2 - lat1)
+        dlon = radians(lon2 - lon1)
+        a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
+        return 2*R*atan2(sqrt(a), sqrt(1-a))
     uid = request.uid
+    dist_km = haversine(pickup['lat'], pickup['lng'], dropoff['lat'], dropoff['lng'])
+    fee = round(2.0 * dist_km + 5.0, 2)
     #uid = 'test_uid'
+
     delivery_data = {
         'pickupLocation': {'lat': pickup['lat'], 'lng': pickup['lng']},
         'dropoffLocation': {'lat': dropoff['lat'], 'lng': dropoff['lng']},
@@ -560,6 +570,8 @@ def create_delivery():
         'status': 'pending',
         'createdBy': uid,
         'assignedCourier': None,
+        'fee': fee,
+        'rating': None,
         'timestampCreated': firestore.SERVER_TIMESTAMP,
         'timestampUpdated': firestore.SERVER_TIMESTAMP
     }
