@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'role_selection_page.dart';
+import '../services/location_service.dart';
 
 class AccountSetupPage extends StatefulWidget {
   final String? email; // From authentication
@@ -20,6 +21,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
   final _formKey = GlobalKey<FormState>();
   final PageController _pageController = PageController();
   int _currentStep = 0;
+  bool _isDetectingLocation = false;
   
   // Form controllers
   final TextEditingController _firstNameController = TextEditingController();
@@ -122,7 +124,39 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
       );
     }
   }
+  Future<void> _detectCurrentLocation() async {
+    setState(() {
+      _isDetectingLocation = true;
+    });
 
+    try {
+      String address = await LocationService.getCurrentAddress();
+      setState(() {
+        _addressController.text = address;
+        _isDetectingLocation = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Location detected successfully!')),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _isDetectingLocation = false;
+      });
+      
+      LocationService.showLocationPermissionDialog(context, _detectCurrentLocation);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -431,33 +465,40 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
           ),
           const SizedBox(height: 32),
           
-          TextFormField(
-            controller: _addressController,
-            decoration: InputDecoration(
-              labelText: 'Street Address',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              prefixIcon: const Icon(Icons.location_on_outlined),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.my_location),
-                onPressed: () {
-                  // TODO: Implement location detection
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Location detection would be implemented here'),
-                    ),
-                  );
+          Stack(
+            children: [
+              TextFormField(
+                controller: _addressController,
+                decoration: InputDecoration(
+                  labelText: 'Street Address',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.location_on_outlined),
+                  suffixIcon: _isDetectingLocation 
+                    ? const Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.my_location),
+                        onPressed: _detectCurrentLocation,
+                        tooltip: 'Detect current location',
+                      ),
+                ),
+                maxLines: 2,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Address is required';
+                  }
+                  return null;
                 },
               ),
-            ),
-            maxLines: 2,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Address is required';
-              }
-              return null;
-            },
+            ],
           ),
           const SizedBox(height: 24),
           

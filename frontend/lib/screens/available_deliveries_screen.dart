@@ -62,7 +62,7 @@ class _AvailableDeliveriesScreenState extends State<AvailableDeliveriesScreen> {
   Future<void> _fetchDeliveries() async {
     // This would normally come from your backend/Firestore
     final resp = await DeliveryService.getDeliveries();
-    final allDeliveries = resp.success ? resp.data! : [];
+    final allDeliveries = resp.success ? List<Delivery>.from(resp.data!) : <Delivery>[];
     
     setState(() {
       _deliveriesInRange = _filterDeliveriesInRange(allDeliveries);
@@ -113,7 +113,7 @@ class _AvailableDeliveriesScreenState extends State<AvailableDeliveriesScreen> {
     );
   }
   
-  void _updateOperationalRadius(double newRadius) {
+  Future<void> _updateOperationalRadius(double newRadius) async {
     setState(() {
       _operationalRadius = newRadius;
       if (_courierLocation != null) {
@@ -128,11 +128,11 @@ class _AvailableDeliveriesScreenState extends State<AvailableDeliveriesScreen> {
           )
         };
       }
-      
-      // Refilter deliveries with new radius
-      //List<Delivery> allDeliveries = _deliveryService.getMockDeliveries();
-      final resp = await DeliveryService.getDeliveries();
-      final allDeliveries = resp.success ? resp.data! : [];
+    });
+
+    final resp = await DeliveryService.getDeliveries();
+    final allDeliveries = resp.success ? List<Delivery>.from(resp.data!) : <Delivery>[];
+    setState(() {
       _deliveriesInRange = _filterDeliveriesInRange(allDeliveries);
       _createDeliveryMarkers();
     });
