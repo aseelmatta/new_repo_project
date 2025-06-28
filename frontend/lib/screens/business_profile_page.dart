@@ -12,6 +12,33 @@ class BusinessProfilePage extends StatefulWidget {
 }
 
 class _BusinessProfilePageState extends State<BusinessProfilePage> {
+  bool _isLoading = true;
+
+@override
+void initState() {
+  super.initState();
+  _loadProfile();
+}
+
+Future<void> _loadProfile() async {
+  final profile = await AuthService.getUserProfile();
+  if (profile != null) {
+    setState(() {
+      _businessNameController.text   = profile['businessName']   ?? '';
+      _businessTypeController.text   = profile['businessType']   ?? '';
+      _taxIdController.text          = profile['taxId']          ?? '';
+      _contactPersonController.text  = profile['contactPerson']  ?? '';
+      _emailController.text          = profile['email']          ?? '';
+      _phoneController.text          = profile['phone']          ?? '';
+      _addressController.text        = profile['address']        ?? '';
+      _selectedRole                  = profile['role']           ?? _selectedRole;
+      _isLoading                     = false;
+    });
+  } else {
+    setState(() => _isLoading = false);
+  }
+}
+
   final _formKey = GlobalKey<FormState>();
   bool _isEditing = false;
   
@@ -51,20 +78,30 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
     });
   }
 
-  void _saveProfile() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isEditing = false;
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
+ Future<void> _saveProfile() async {
+  if (!_formKey.currentState!.validate()) return;
+  final updated = {
+    'businessName':  _businessNameController.text.trim(),
+    'businessType':  _businessTypeController.text.trim(),
+    'taxId':         _taxIdController.text.trim(),
+    'contactPerson': _contactPersonController.text.trim(),
+    'email':         _emailController.text.trim(),
+    'phone':         _phoneController.text.trim(),
+    'address':       _addressController.text.trim(),
+    'role':          _selectedRole,
+  };
+  final success = await AuthService.updateUserProfile(updated);
+  if (success) {
+    setState(() => _isEditing = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profile updated!'), backgroundColor: Colors.green)
+    );
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Update failed'), backgroundColor: Colors.red)
+    );
   }
+}
 
   void _showRoleChangeDialog() {
     showDialog(
