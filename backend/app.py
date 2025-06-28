@@ -1,5 +1,5 @@
 # app.py
-from math import radians, sin, cos, sqrt, atan2
+import math
 from firebase_admin import auth as firebase_auth
 
 from flask import Flask, jsonify, request
