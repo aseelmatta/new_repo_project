@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'business_dashboard.dart';
 import '../services/auth_service.dart';
+import '../services/location_service.dart';
 
 
 class BusinessSetupPage extends StatefulWidget {
@@ -20,6 +21,7 @@ class _BusinessSetupPageState extends State<BusinessSetupPage> {
   final _formKey = GlobalKey<FormState>();
   final PageController _pageController = PageController();
   int _currentStep = 0;
+  bool _isDetectingLocation = false;
   
   // Business-specific form controllers
   final TextEditingController _businessNameController = TextEditingController();
@@ -167,7 +169,39 @@ void _saveUserData(Map<String, dynamic> userData) async {
     );
   }
 }
+Future<void> _detectBusinessLocation() async {
+  setState(() {
+    _isDetectingLocation = true;
+  });
 
+  try {
+    String address = await LocationService.getCurrentAddress();
+    setState(() {
+      _businessAddressController.text = address;
+      _isDetectingLocation = false;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Business location detected!')),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  } catch (e) {
+    setState(() {
+      _isDetectingLocation = false;
+    });
+    
+    LocationService.showLocationPermissionDialog(context, _detectBusinessLocation);
+  }
+}
 
   void _showCompletionDialog() {
     showDialog(
@@ -424,21 +458,29 @@ void _saveUserData(Map<String, dynamic> userData) async {
                 borderRadius: BorderRadius.circular(12),
               ),
               prefixIcon: const Icon(Icons.location_on),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.my_location),
-                onPressed: () {
-                  // TODO: Implement location picker
-                },
-              ),
-            ),
-            maxLines: 2,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Business address is required';
-              }
-              return null;
-            },
+              suffixIcon: _isDetectingLocation 
+      ? const Padding(
+          padding: EdgeInsets.all(12.0),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
+        )
+      : IconButton(
+          icon: const Icon(Icons.my_location),
+          onPressed: _detectBusinessLocation,
+          tooltip: 'Detect current location',
+        ),
+  ),
+  maxLines: 2,
+  validator: (value) {
+    if (value == null || value.isEmpty) {
+      return 'Business address is required';
+    }
+    return null;
+  },
+),
           const SizedBox(height: 16),
           
           TextFormField(

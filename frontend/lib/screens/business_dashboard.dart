@@ -5,6 +5,8 @@ import '../services/delivery_service.dart';
 import 'business_chat_page.dart';
 import 'business_profile_page.dart';
 import 'delivery_tracking_page.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class BusinessDashboard extends StatefulWidget {
   const BusinessDashboard({super.key});
@@ -53,6 +55,573 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
   }
 
 
+void _showContactCourierDialog(BuildContext context, Delivery delivery) {
+  const String courierPhone = '+1 (555) 987-6543';
+  const String courierName = 'John Doe';
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.green,
+            child: Text('JD', style: TextStyle(color: Colors.white)),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(courierName, style: TextStyle(fontSize: 16)),
+              Text('Your Courier', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.phone, color: Colors.green),
+            ),
+            title: const Text('Call Courier'),
+            subtitle: Text(courierPhone),
+            onTap: () {
+              Navigator.pop(context);
+              _callCourier(courierPhone);
+            },
+          ),
+          ListTile(
+            leading: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.sms, color: Colors.blue),
+            ),
+            title: const Text('Send SMS'),
+            subtitle: const Text('Send a text message'),
+            onTap: () {
+              Navigator.pop(context);
+              _sendSMS(courierPhone);
+            },
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Your courier is available 8 AM - 10 PM',
+                    style: TextStyle(fontSize: 12, color: Colors.orange[700]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _callCourier(String phoneNumber) async {
+  // Remove formatting for actual calling
+  String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+  final Uri phoneUri = Uri(scheme: 'tel', path: cleanNumber);
+  
+  try {
+    if (await canLaunchUrl(phoneUri)) {
+      await launchUrl(phoneUri);
+    } else {
+      _showContactFallback(phoneNumber, 'call');
+    }
+  } catch (e) {
+    _showContactFallback(phoneNumber, 'call');
+  }
+}
+
+Future<void> _sendSMS(String phoneNumber) async {
+  String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+  final Uri smsUri = Uri(
+    scheme: 'sms',
+    path: cleanNumber,
+    queryParameters: {
+      'body': 'Hi! This is regarding my delivery #${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}. '
+    },
+  );
+  
+  try {
+    if (await canLaunchUrl(smsUri)) {
+      await launchUrl(smsUri);
+    } else {
+      _showContactFallback(phoneNumber, 'message');
+    }
+  } catch (e) {
+    _showContactFallback(phoneNumber, 'message');
+  }
+}
+
+void _showContactFallback(String phoneNumber, String action) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('${action == 'call' ? 'Call' : 'Message'} Courier'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Your courier\'s phone number:'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  phoneNumber,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: phoneNumber));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Phone number copied!')),
+                    );
+                  },
+                  icon: const Icon(Icons.copy),
+                  tooltip: 'Copy number',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You can ${action} this number manually.',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ],
+      ),
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Got it'),
+        ),
+      ],
+    ),
+  );
+}
+void _showRatingDialog(Delivery delivery) {
+  int overallRating = 5;
+  int punctualityRating = 5;
+  int professionalismRating = 5;
+  int communicationRating = 5;
+  TextEditingController feedbackController = TextEditingController();
+  
+  showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: Colors.green,
+              child: Text('JD', style: TextStyle(color: Colors.white)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Rate Your Courier', style: TextStyle(fontSize: 16)),
+                  Text('Delivery #${delivery.id}', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Overall Rating
+              Text(
+                'Overall Experience',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  return IconButton(
+                    onPressed: () => setState(() => overallRating = index + 1),
+                    icon: Icon(
+                      index < overallRating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 32,
+                    ),
+                  );
+                }),
+              ),
+              Text(
+                _getRatingText(overallRating),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _getRatingColor(overallRating),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              const Divider(),
+              
+              // Detailed Ratings
+              Text(
+                'Rate Specific Aspects',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              
+              // Punctuality
+              _buildDetailedRating(
+                'Punctuality',
+                'Was the courier on time?',
+                punctualityRating,
+                (rating) => setState(() => punctualityRating = rating),
+              ),
+              
+              // Professionalism
+              _buildDetailedRating(
+                'Professionalism',
+                'How professional was the courier?',
+                professionalismRating,
+                (rating) => setState(() => professionalismRating = rating),
+              ),
+              
+              // Communication
+              _buildDetailedRating(
+                'Communication',
+                'How was the communication?',
+                communicationRating,
+                (rating) => setState(() => communicationRating = rating),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Feedback Text
+              Text(
+                'Additional Feedback (Optional)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: feedbackController,
+                decoration: InputDecoration(
+                  hintText: 'Share your experience or suggestions...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: EdgeInsets.all(12),
+                ),
+                maxLines: 3,
+                maxLength: 200,
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Tip Option
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.monetization_on, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Add a tip?',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            'Show appreciation for great service',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showTipDialog(delivery, overallRating);
+                      },
+                      child: Text('Add Tip'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _submitRating(
+                delivery,
+                overallRating,
+                punctualityRating,
+                professionalismRating,
+                communicationRating,
+                feedbackController.text,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Submit Rating'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildDetailedRating(
+  String title,
+  String subtitle,
+  int rating,
+  Function(int) onRatingChanged,
+) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(fontWeight: FontWeight.w500)),
+              Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            ],
+          ),
+        ),
+        Expanded(
+          flex: 3,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: List.generate(5, (index) {
+              return GestureDetector(
+                onTap: () => onRatingChanged(index + 1),
+                child: Icon(
+                  index < rating ? Icons.star : Icons.star_border,
+                  color: Colors.amber,
+                  size: 20,
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+String _getRatingText(int rating) {
+  switch (rating) {
+    case 1: return 'Poor';
+    case 2: return 'Fair';
+    case 3: return 'Good';
+    case 4: return 'Very Good';
+    case 5: return 'Excellent';
+    default: return '';
+  }
+}
+
+Color _getRatingColor(int rating) {
+  switch (rating) {
+    case 1: return Colors.red;
+    case 2: return Colors.orange;
+    case 3: return Colors.yellow[700]!;
+    case 4: return Colors.lightGreen;
+    case 5: return Colors.green;
+    default: return Colors.grey;
+  }
+}
+
+void _submitRating(
+  Delivery delivery,
+  int overallRating,
+  int punctualityRating,
+  int professionalismRating,
+  int communicationRating,
+  String feedback,
+) {
+  // TODO: Send rating to backend
+  print('Rating submitted:');
+  print('Delivery: ${delivery.id}');
+  print('Overall: $overallRating stars');
+  print('Punctuality: $punctualityRating stars');
+  print('Professionalism: $professionalismRating stars');
+  print('Communication: $communicationRating stars');
+  print('Feedback: $feedback');
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.white),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('Thank you! Your $overallRating-star rating has been submitted.'),
+          ),
+        ],
+      ),
+      backgroundColor: Colors.green,
+      duration: const Duration(seconds: 3),
+      action: SnackBarAction(
+        label: 'View Receipt',
+        textColor: Colors.white,
+        onPressed: () {
+          // TODO: Show delivery receipt
+        },
+      ),
+    ),
+  );
+}
+
+void _showTipDialog(Delivery delivery, int rating) {
+  List<double> tipAmounts = [2.0, 5.0, 10.0, 15.0];
+  double? selectedTip;
+  TextEditingController customTipController = TextEditingController();
+  
+  showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text('Add a Tip'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Your courier did a great job! Add a tip to show appreciation.'),
+            const SizedBox(height: 16),
+            
+            // Preset tip amounts
+            Wrap(
+              spacing: 8,
+              children: tipAmounts.map((amount) {
+                bool isSelected = selectedTip == amount;
+                return ChoiceChip(
+                  label: Text('\$${amount.toStringAsFixed(0)}'),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      selectedTip = selected ? amount : null;
+                      customTipController.clear();
+                    });
+                  },
+                  selectedColor: Colors.green.withOpacity(0.2),
+                );
+              }).toList(),
+            ),
+            
+            const SizedBox(height: 12),
+            Text('Or enter custom amount:', style: TextStyle(fontSize: 12)),
+            const SizedBox(height: 8),
+            
+            // Custom tip amount
+            TextField(
+              controller: customTipController,
+              decoration: InputDecoration(
+                prefixText: '\$ ',
+                hintText: '0.00',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              keyboardType: TextInputType.number,
+              onChanged: (value) {
+                setState(() {
+                  selectedTip = null; // Clear preset selection
+                });
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Skip'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              double tipAmount = selectedTip ?? double.tryParse(customTipController.text) ?? 0;
+              if (tipAmount > 0) {
+                Navigator.pop(context);
+                _processTip(delivery, tipAmount);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Please select or enter a tip amount')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Add Tip'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _processTip(Delivery delivery, double amount) {
+  // TODO: Process tip payment
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Thank you! \$${amount.toStringAsFixed(2)} tip added for your courier.'),
+      backgroundColor: Colors.green,
+      duration: const Duration(seconds: 3),
+    ),
+  );
+}
   void _onNavigationTap(int index) {
     setState(() {
       _currentIndex = index;
@@ -108,13 +677,11 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            // TODO: Implement messenger
+                            _showContactCourierDialog(context, delivery);
                           },
                           icon: const Icon(Icons.message),
                           label: const Text('Message Courier'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -154,9 +721,7 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: Implement rating
-                      },
+                      onPressed: () => _showRatingDialog(delivery),
                       icon: const Icon(Icons.star),
                       label: const Text('Rate this Delivery'),
                     ),
