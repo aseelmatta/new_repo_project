@@ -19,6 +19,7 @@ class CourierDashboard extends StatefulWidget {
 
 class _CourierDashboardState extends State<CourierDashboard> {
   DateTime _lastSentToServer = DateTime.fromMillisecondsSinceEpoch(0);
+  
 
   List<Delivery> _allDeliveries = [];
   List<Delivery> _availableDeliveries = [];
