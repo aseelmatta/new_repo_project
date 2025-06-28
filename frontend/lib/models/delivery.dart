@@ -12,6 +12,8 @@ class Delivery {
   final String description;
   
   // Additional fields for backend integration
+  final double? fee;
+  final double? rating;
   final String? recipientName;
   final String? recipientPhone;
   final DateTime? createdAt;
@@ -35,6 +37,8 @@ class Delivery {
     this.assignedCourier,
     this.createdBy,
     this.instructions,
+    this.fee,
+    this.rating,
   });
 
   // Create from backend JSON response
@@ -64,6 +68,8 @@ class Delivery {
       assignedCourier: json['assignedCourier'],
       createdBy: json['createdBy'],
       instructions: json['instructions'],
+      fee: (json['fee'] as num?)?.toDouble(),
+      rating: (json['rating'] as num?)?.toDouble(),
     );
   }
 
@@ -82,6 +88,8 @@ class Delivery {
       'recipientPhone': recipientPhone ?? '',
       'instructions': instructions ?? description,
       'status': status,
+      'fee': fee,
+      'rating': rating,
     };
   }
 

@@ -299,6 +299,15 @@ class AuthService {
     }
   }
   
+    /// Returns the UID of the signed‐in user (or throws if none).
+  static Future<String> currentUserId() async {
+    final uid = await getUid();
+    if (uid == null) {
+      throw StateError('No signed-in user.');
+    }
+    return uid;
+  }
+
   // Get current user role
   static Future<String?> getUserRole() async {
     if (_userRole != null) return _userRole;

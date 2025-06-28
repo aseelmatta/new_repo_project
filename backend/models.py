@@ -10,6 +10,8 @@ class Order:
         status: str = 'pending',
         carrier_id: str = None,
         business_id: str = None,
+        fee: float = 0.0,
+        rating: float = None,
         doc_id: str = None
     ):
         self.id = doc_id
@@ -18,6 +20,8 @@ class Order:
         self.status = status
         self.carrier_id = carrier_id
         self.business_id = business_id
+        self.fee = fee
+        self.rating = rating
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], doc_id: str):
@@ -27,6 +31,8 @@ class Order:
             status = data.get('status', 'pending'),
             carrier_id = data.get('carrier_id'),
             business_id = data.get('business_id'),
+            fee         = float(data.get('fee', 0.0)),
+            rating      = None if data.get('rating') is None else float(data['rating']),
             doc_id = doc_id
         )
 
@@ -36,7 +42,9 @@ class Order:
             'items': self.items,
             'status': self.status,
             'carrier_id': self.carrier_id,
-            'business_id': self.business_id
+            'business_id': self.business_id,
+            'fee': self.fee,
+            'rating': self.rating,
         }
 
 
