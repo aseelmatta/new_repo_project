@@ -129,7 +129,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
           delivery.pickupLocation.latitude,
           delivery.pickupLocation.longitude,
         );
-        return distance <= _operationalRadius && delivery.status == 'pending';
+        return distance <= _operationalRadius && delivery.status == 'pending'|| delivery.status == 'accepted';
       }).toList();
     });
   }
