@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:frontend/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:frontend/services/delivery_service.dart';
+
 
 
 class CourierProfilePage extends StatefulWidget {
@@ -13,18 +16,15 @@ class CourierProfilePage extends StatefulWidget {
 class _CourierProfilePageState extends State<CourierProfilePage> {
   final _formKey = GlobalKey<FormState>();
   bool _isEditing = false;
-  
+  String _photoUrl = '';
   // Personal Information Controllers
-  final TextEditingController _firstNameController = 
-      TextEditingController(text: 'John');
-  final TextEditingController _lastNameController = 
-      TextEditingController(text: 'Doe');
-  final TextEditingController _emailController = 
-      TextEditingController(text: 'john.doe@courier.com');
-  final TextEditingController _phoneController = 
-      TextEditingController(text: '+1 (555) 987-6543');
-  final TextEditingController _addressController = 
-      TextEditingController(text: '456 Courier Lane\nMountain View, CA 94041');
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+
+
   
   // Vehicle Information Controllers
   final TextEditingController _vehicleModelController = 
@@ -52,11 +52,10 @@ class _CourierProfilePageState extends State<CourierProfilePage> {
   List<String> _selectedDeliveryTypes = ['Documents', 'Electronics', 'Food & Beverages'];
 
   // Performance metrics (mock data)
-  final double _totalEarnings = 2847.50;
-  final int _totalDeliveries = 189;
-  final double _averageRating = 4.8;
-  final int _fiveStarRatings = 167;
-  final String _memberSince = 'March 2024';
+    double _totalEarnings   = 0.0;
+    int    _totalDeliveries = 0;
+    double _averageRating   = 0.0;
+    String _memberSince     = '';
 
   final List<String> _vehicleTypes = ['car', 'motorcycle', 'bicycle', 'van'];
   final List<String> _availabilitySlots = [
@@ -73,6 +72,84 @@ class _CourierProfilePageState extends State<CourierProfilePage> {
     'Fragile Items',
     'Medical Supplies',
   ];
+  bool _isLoading = true; // for showing a spinner
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoading = true);
+
+    // 1. Fetch the map from your backend
+    final profile = await AuthService.getUserProfile();
+    if (profile != null) {
+      // 2. Fill each controller/variable
+      _firstNameController.text      = profile['firstName']           ?? '';
+      _lastNameController.text       = profile['lastName']            ?? '';
+      _emailController.text          = profile['email']               ?? '';
+      _phoneController.text          = profile['phone']               ?? '';
+      _addressController.text        = profile['address']             ?? '';
+
+      _selectedVehicleType           = profile['vehicleType']         ?? _selectedVehicleType;
+      _vehicleModelController.text   = profile['vehicleModel']        ?? '';
+      _licensePlateController.text   = profile['licensePlate']        ?? '';
+      _drivingLicenseController.text = profile['drivingLicense']      ?? '';
+
+      _emergencyContactController.text = profile['emergencyContact'] ?? '';
+      _emergencyPhoneController.text   = profile['emergencyPhone']   ?? '';
+
+      _isAvailableWeekends          = profile['isAvailableWeekends'] ?? _isAvailableWeekends;
+      _hasInsurance                 = profile['hasInsurance']        ?? _hasInsurance;
+      _canCarryFragileItems         = profile['canCarryFragileItems']?? _canCarryFragileItems;
+      _canCarryLargeItems           = profile['canCarryLargeItems']  ?? _canCarryLargeItems;
+      _operationalRadius            = (profile['operationalRadius'] as num?)?.toDouble()
+                                      ?? _operationalRadius;
+
+      _selectedAvailability         = List<String>.from(profile['availability'] ?? _selectedAvailability);
+      _selectedDeliveryTypes        = List<String>.from(profile['deliveryTypes'] ?? _selectedDeliveryTypes);
+
+      _photoUrl                     = profile['photoURL']             ?? '';
+    }
+    await _loadMetrics();
+    setState(() => _isLoading = false);
+  }
+
+  /// Fetch all deliveries, then compute total count, earnings & avg rating
+  Future<void> _loadMetrics() async {
+    final resp = await DeliveryService.getDeliveries();
+    if (!resp.success) return;
+
+    // 1) get this courier’s UID however you have it
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+
+    // 2) filter only deliveries assigned to me
+    final mine = resp.data!
+      .where((d) => d.assignedCourier == userId)
+      .toList();
+
+    // 3) total count
+    final count = mine.length;
+
+    // 4) sum up fees (assuming your Delivery model has `fee` double)
+    final earnings = mine.fold<double>(0.0, (sum, d) => sum + (d.fee ?? 0.0));
+
+    // 5) average rating (assuming a `rating` field on completed ones)
+    final rated = mine.where((d) => d.rating != null).map((d) => d.rating!).toList();
+    final avg = rated.isEmpty
+      ? 0.0
+      : rated.reduce((a, b) => a + b) / rated.length;
+
+    // 6) update state so UI refreshes
+    setState(() {
+      _totalDeliveries = count;
+      _totalEarnings   = earnings;
+      _averageRating   = avg;
+    });
+  }
 
   @override
   void dispose() {
@@ -95,20 +172,49 @@ class _CourierProfilePageState extends State<CourierProfilePage> {
     });
   }
 
-  void _saveProfile() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isEditing = false;
-      });
-      
+  void _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final updated = {
+      'firstName':       _firstNameController.text.trim(),
+      'lastName':        _lastNameController.text.trim(),
+      'email':           _emailController.text.trim(),
+      'phone':           _phoneController.text.trim(),
+      'address':         _addressController.text.trim(),
+
+      'vehicleType':     _selectedVehicleType,
+      'vehicleModel':    _vehicleModelController.text.trim(),
+      'licensePlate':    _licensePlateController.text.trim(),
+      'drivingLicense':  _drivingLicenseController.text.trim(),
+
+      'emergencyContact':_emergencyContactController.text.trim(),
+      'emergencyPhone':  _emergencyPhoneController.text.trim(),
+
+      'isAvailableWeekends':    _isAvailableWeekends,
+      'hasInsurance':           _hasInsurance,
+      'canCarryFragileItems':   _canCarryFragileItems,
+      'canCarryLargeItems':     _canCarryLargeItems,
+      'operationalRadius':      _operationalRadius,
+
+      'availability':   _selectedAvailability,
+      'deliveryTypes':  _selectedDeliveryTypes,
+      // you can include 'photoURL' if you let them change it
+    };
+
+    final success = await AuthService.updateUserProfile(updated);
+    if (success) {
+      setState(() => _isEditing = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully!'),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text('Profile updated!'), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Update failed'), backgroundColor: Colors.red),
       );
     }
   }
+
+
 
   void _toggleAvailability() {
     setState(() {
@@ -214,6 +320,13 @@ class _CourierProfilePageState extends State<CourierProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+      if (_isLoading) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('My Profile')),
+      body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Profile'),
