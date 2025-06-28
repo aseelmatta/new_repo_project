@@ -1,5 +1,5 @@
 # app.py
-
+from math import radians, sin, cos, sqrt, atan2
 from firebase_admin import auth as firebase_auth
 
 from flask import Flask, jsonify, request
@@ -556,6 +556,7 @@ def create_delivery():
         dlon = radians(lon2 - lon1)
         a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
         return 2*R*atan2(sqrt(a), sqrt(1-a))
+    
     uid = request.uid
     dist_km = haversine(pickup['lat'], pickup['lng'], dropoff['lat'], dropoff['lng'])
     fee = round(2.0 * dist_km + 5.0, 2)
