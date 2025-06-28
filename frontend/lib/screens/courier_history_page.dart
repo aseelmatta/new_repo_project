@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/delivery.dart';
-import '../services/mock_delivery_service.dart';
+import '../services/delivery_service.dart';
 
 class CourierHistoryPage extends StatefulWidget {
   const CourierHistoryPage({super.key});
@@ -12,7 +12,7 @@ class CourierHistoryPage extends StatefulWidget {
 }
 
 class _CourierHistoryPageState extends State<CourierHistoryPage> {
-  final MockDeliveryService _deliveryService = MockDeliveryService();
+  
   List<Delivery> _deliveries = [];
   String _searchQuery = '';
   String _statusFilter = 'all';
@@ -25,56 +25,26 @@ class _CourierHistoryPageState extends State<CourierHistoryPage> {
     _loadCourierDeliveries();
   }
 
-  void _loadCourierDeliveries() {
+  Future<void> _loadCourierDeliveries() async {
+    // 1. Fetch all deliveries from your Flask backend
+    final resp = await DeliveryService.getDeliveries();
+
+    // 2. Show an error if the request failed
+    if (!resp.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading history: ${resp.error}')),
+      );
+      return;
+    }
+
+    // 3. Keep only completed or cancelled deliveries for history
+    final history = resp.data!
+        .where((d) => d.status == 'completed' || d.status == 'cancelled')
+        .toList();
+
+    // 4. Update the UI
     setState(() {
-      // For demo, we'll show completed and cancelled deliveries as courier history
-      _deliveries = _deliveryService.getMockDeliveries()
-          .where((delivery) => 
-              delivery.status == 'completed' || delivery.status == 'cancelled')
-          .toList();
-      
-      // Add some mock courier-specific data
-      _deliveries.addAll([
-        Delivery(
-          id: 'HIST001',
-          pickupLocation: LatLng(37.4419, -122.1430),
-          pickupAddress: '1 Hacker Way, Menlo Park, CA',
-          dropoffLocation: LatLng(37.4030, -122.0326),
-          dropoffAddress: '2025 Stierlin Ct, Mountain View, CA',
-          status: 'completed',
-          description: 'Electronics Package',
-          recipientName: 'Alex Thompson',
-          recipientPhone: '+1 (555) 111-2222',
-          createdAt: DateTime.now().subtract(Duration(days: 1)),
-          instructions: 'Delivered successfully',
-        ),
-        Delivery(
-          id: 'HIST002',
-          pickupLocation: LatLng(37.3861, -122.0839),
-          pickupAddress: '899 Cherry Ave, San Bruno, CA',
-          dropoffLocation: LatLng(37.4043, -122.0748),
-          dropoffAddress: '333 Middlefield Rd, Menlo Park, CA',
-          status: 'completed',
-          description: 'Food Delivery',
-          recipientName: 'Maria Garcia',
-          recipientPhone: '+1 (555) 333-4444',
-          createdAt: DateTime.now().subtract(Duration(days: 2)),
-          instructions: 'Left at front door as requested',
-        ),
-        Delivery(
-          id: 'HIST003',
-          pickupLocation: LatLng(37.4024, -122.0519),
-          pickupAddress: '1065 La Avenida St, Mountain View, CA',
-          dropoffLocation: LatLng(37.3874, -122.0575),
-          dropoffAddress: '650 Castro St, Mountain View, CA',
-          status: 'completed',
-          description: 'Document Envelope',
-          recipientName: 'Robert Wilson',
-          recipientPhone: '+1 (555) 555-6666',
-          createdAt: DateTime.now().subtract(Duration(days: 3)),
-          instructions: 'Signed by recipient',
-        ),
-      ]);
+      _deliveries = history;
     });
   }
 

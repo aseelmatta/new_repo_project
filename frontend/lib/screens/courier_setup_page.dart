@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'courier_dashboard.dart';
+import '../services/auth_service.dart';
+
 class CourierSetupPage extends StatefulWidget {
   final Map<String, String> userData;
   
@@ -152,10 +154,16 @@ class _CourierSetupPageState extends State<CourierSetupPage> {
     }
   }
 
-  void _saveUserData(Map<String, dynamic> userData) {
-    // TODO: Save to your backend/database
-    print('Saving courier user data: $userData');
+  void _saveUserData(Map<String, dynamic> userData) async {
+    bool success = await AuthService.createUserProfile(userData);
+    if (success) {
+      print('✅ Courier user data saved to backend.');
+    } else {
+      print('❌ Failed to save courier user data to backend.');
+      // Optionally show an error to the user
+    }
   }
+
 
   void _showCompletionDialog() {
     showDialog(

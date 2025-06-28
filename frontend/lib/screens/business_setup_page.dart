@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'business_dashboard.dart';
+import '../services/auth_service.dart';
+
 
 class BusinessSetupPage extends StatefulWidget {
   final Map<String, String> userData;
@@ -149,10 +151,23 @@ class _BusinessSetupPageState extends State<BusinessSetupPage> {
     }
   }
 
-  void _saveUserData(Map<String, dynamic> userData) {
-    // TODO: Save to your backend/database
-    print('Saving business user data: $userData');
+void _saveUserData(Map<String, dynamic> userData) async {
+  // Call the backend to save profile
+  bool success = await AuthService.createUserProfile(userData);
+
+  if (success) {
+    print('✅ Business user data saved to backend.');
+  } else {
+    print('❌ Failed to save business user data to backend.');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Failed to save profile to server!'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
+
 
   void _showCompletionDialog() {
     showDialog(

@@ -126,47 +126,47 @@ class _WelcomePageState extends State<WelcomePage> {
   }
 
   // Facebook Sign In
-  Future<void> _signInWithFacebook() async {
-    setState(() {
-      _isLoading = true;
-    });
+  // Future<void> _signInWithFacebook() async {
+  //   setState(() {
+  //     _isLoading = true;
+  //   });
 
-    try {
-      AuthResult result = await AuthService.signInWithFacebook();
+  //   try {
+  //     AuthResult result = await AuthService.signInWithFacebook();
       
-      if (result.success) {
-        print('Facebook sign in successful: ${result.userData?['email']}');
+  //     if (result.success) {
+  //       print('Facebook sign in successful: ${result.userData?['email']}');
         
-        // Check if user has profile setup
-        Map<String, dynamic>? profile = await AuthService.getUserProfile();
+  //       // Check if user has profile setup
+  //       Map<String, dynamic>? profile = await AuthService.getUserProfile();
         
-        if (profile != null && profile['role'] != null) {
-          // User has completed setup
-          _navigateToDashboard(profile['role']);
-        } else {
-          // New user or incomplete setup - go to account setup
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AccountSetupPage(
-                email: result.userData?['email'],
-                displayName: result.userData?['displayName'],
-              ),
-            ),
-          );
-        }
-      } else {
-        _showErrorDialog('Facebook Sign In Failed', result.error ?? 'Authentication failed');
-      }
-    } catch (e) {
-      print('Facebook sign in error: $e');
-      _showErrorDialog('Facebook Sign In Failed', 'Please check your internet connection and try again.');
-    }
+  //       if (profile != null && profile['role'] != null) {
+  //         // User has completed setup
+  //         _navigateToDashboard(profile['role']);
+  //       } else {
+  //         // New user or incomplete setup - go to account setup
+  //         Navigator.pushReplacement(
+  //           context,
+  //           MaterialPageRoute(
+  //             builder: (context) => AccountSetupPage(
+  //               email: result.userData?['email'],
+  //               displayName: result.userData?['displayName'],
+  //             ),
+  //           ),
+  //         );
+  //       }
+  //     } else {
+  //       _showErrorDialog('Facebook Sign In Failed', result.error ?? 'Authentication failed');
+  //     }
+  //   } catch (e) {
+  //     print('Facebook sign in error: $e');
+  //     _showErrorDialog('Facebook Sign In Failed', 'Please check your internet connection and try again.');
+  //   }
 
-    setState(() {
-      _isLoading = false;
-    });
-  }
+  //   setState(() {
+  //     _isLoading = false;
+  //   });
+  // }
 
   // Show error dialog
   void _showErrorDialog(String title, String message) {
@@ -250,21 +250,21 @@ class _WelcomePageState extends State<WelcomePage> {
                           color: Colors.white,
                           onPressed: _signInWithGoogle,
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'or',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildLoginButton(
-                          context: context,
-                          imagePath: "assets/icons/facebook.png",
-                          color: Colors.blue,
-                          onPressed: _signInWithFacebook,
-                        ),
+                        // const SizedBox(height: 16),
+                        // Text(
+                        //   'or',
+                        //   style: TextStyle(
+                        //     color: Colors.grey.shade600,
+                        //     fontSize: 16,
+                        //   ),
+                        // ),
+                        // const SizedBox(height: 16),
+                        // _buildLoginButton(
+                        //   context: context,
+                        //   imagePath: "assets/icons/facebook.png",
+                        //   color: Colors.blue,
+                        //   onPressed: _signInWithFacebook,
+                        // ),
                       ],
                     ],
                   ),

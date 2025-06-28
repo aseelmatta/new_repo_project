@@ -5,7 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import '../models/delivery.dart';
 import '../widgets/delivery_card.dart';
 import '../widgets/delivery_details_sheet.dart';
-import '../services/mock_delivery_service.dart';
+import '../services/delivery_service.dart';
+
 
 class AvailableDeliveriesScreen extends StatefulWidget {
   @override
@@ -19,7 +20,7 @@ class _AvailableDeliveriesScreenState extends State<AvailableDeliveriesScreen> {
   Set<Marker> _deliveryMarkers = {};
   Set<Circle> _operationalAreaCircle = {};
   List<Delivery> _deliveriesInRange = [];
-  final MockDeliveryService _deliveryService = MockDeliveryService();
+  
   
   @override
   void initState() {
@@ -60,7 +61,8 @@ class _AvailableDeliveriesScreenState extends State<AvailableDeliveriesScreen> {
   
   Future<void> _fetchDeliveries() async {
     // This would normally come from your backend/Firestore
-    List<Delivery> allDeliveries = _deliveryService.getMockDeliveries();
+    final resp = await DeliveryService.getDeliveries();
+    final allDeliveries = resp.success ? resp.data! : [];
     
     setState(() {
       _deliveriesInRange = _filterDeliveriesInRange(allDeliveries);
@@ -128,7 +130,9 @@ class _AvailableDeliveriesScreenState extends State<AvailableDeliveriesScreen> {
       }
       
       // Refilter deliveries with new radius
-      List<Delivery> allDeliveries = _deliveryService.getMockDeliveries();
+      //List<Delivery> allDeliveries = _deliveryService.getMockDeliveries();
+      final resp = await DeliveryService.getDeliveries();
+      final allDeliveries = resp.success ? resp.data! : [];
       _deliveriesInRange = _filterDeliveriesInRange(allDeliveries);
       _createDeliveryMarkers();
     });

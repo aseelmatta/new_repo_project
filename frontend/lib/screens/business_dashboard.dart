@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/delivery.dart';
-import '../services/mock_delivery_service.dart';
+import '../services/delivery_service.dart';
 import 'business_chat_page.dart';
 import 'business_profile_page.dart';
 import 'delivery_tracking_page.dart';
@@ -14,7 +14,11 @@ class BusinessDashboard extends StatefulWidget {
 }
 
 class _BusinessDashboardState extends State<BusinessDashboard> {
-  final MockDeliveryService _deliveryService = MockDeliveryService();
+  LatLng? _pickupLocation;
+  LatLng? _dropoffLocation;
+  String _pickupAddress = '';
+  String _dropoffAddress = '';
+
   List<Delivery> _deliveries = [];
   String _searchQuery = '';
   bool _showMapView = false;
@@ -37,11 +41,17 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
     super.dispose();
   }
 
-  void _loadDeliveries() {
-    setState(() {
-      _deliveries = _deliveryService.getMockDeliveries();
-    });
+  Future<void> _loadDeliveries() async {
+    final resp = await DeliveryService.getDeliveries();
+    if (resp.success) {
+      setState(() => _deliveries = resp.data!);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading deliveries: ${resp.error}')),
+      );
+    }
   }
+
 
   void _onNavigationTap(int index) {
     setState(() {
@@ -238,13 +248,13 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
   }
 
   void _showCreateDeliveryForm() {
-    LatLng? pickupLocation;
-    LatLng? dropoffLocation;
-    String pickupAddress = '';
-    String dropoffAddress = '';
+
     bool selectingPickup = true;
     TextEditingController pickupController = TextEditingController();
     TextEditingController dropoffController = TextEditingController();
+    TextEditingController recipientNameController = TextEditingController();
+    TextEditingController recipientPhoneController = TextEditingController();
+    TextEditingController instructionsController = TextEditingController();
     GoogleMapController? mapController;
     
     void showMapSelector(BuildContext context, bool isPickup) {
@@ -267,16 +277,18 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                   actions: [
                     TextButton(
                       onPressed: () {
-                        if (selectingPickup && pickupLocation != null) {
-                          pickupAddress = 'Location at ${pickupLocation!.latitude.toStringAsFixed(4)}, ${pickupLocation!.longitude.toStringAsFixed(4)}';
-                          pickupController.text = pickupAddress;
-                        } else if (!selectingPickup && dropoffLocation != null) {
-                          dropoffAddress = 'Location at ${dropoffLocation!.latitude.toStringAsFixed(4)}, ${dropoffLocation!.longitude.toStringAsFixed(4)}';
-                          dropoffController.text = dropoffAddress;
-                        }
+                        setState(() {
+                          if (selectingPickup && _pickupLocation != null) {
+                            _pickupAddress = 'Location at ${_pickupLocation!.latitude.toStringAsFixed(4)}, ${_pickupLocation!.longitude.toStringAsFixed(4)}';
+                            pickupController.text = _pickupAddress;
+                          } else if (!selectingPickup && _dropoffLocation != null) {
+                            _dropoffAddress = 'Location at ${_dropoffLocation!.latitude.toStringAsFixed(4)}, ${_dropoffLocation!.longitude.toStringAsFixed(4)}';
+                            dropoffController.text = _dropoffAddress;
+                          }
+                        });
                         Navigator.pop(context);
                       },
-                      child: const Text('CONFIRM', style: TextStyle(color: Colors.white)),
+                      child: const Text('CONFIRM', style: TextStyle(color: Colors.blue)),
                     ),
                   ],
                 ),
@@ -306,25 +318,25 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                       mapController = controller;
                     },
                     markers: {
-                      if (selectingPickup && pickupLocation != null)
+                      if (selectingPickup && _pickupLocation != null)
                         Marker(
                           markerId: const MarkerId('pickup'),
-                          position: pickupLocation!,
+                          position: _pickupLocation!,
                           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
                         ),
-                      if (!selectingPickup && dropoffLocation != null)
+                      if (!selectingPickup && _dropoffLocation != null)
                         Marker(
                           markerId: const MarkerId('dropoff'),
-                          position: dropoffLocation!,
+                          position: _dropoffLocation!,
                           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
                         ),
                     },
                     onTap: (LatLng location) {
                       setModalState(() {
                         if (selectingPickup) {
-                          pickupLocation = location;
+                          _pickupLocation = location;
                         } else {
-                          dropoffLocation = location;
+                          _dropoffLocation = location;
                         }
                       });
                     },
@@ -395,7 +407,7 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                   ],
                 ),
                 
-                if (pickupLocation != null && dropoffLocation != null)
+                if (_pickupLocation != null && _dropoffLocation != null)
                   Container(
                     margin: const EdgeInsets.symmetric(vertical: 16),
                     height: 200,
@@ -408,21 +420,21 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                       child: GoogleMap(
                         initialCameraPosition: CameraPosition(
                           target: LatLng(
-                            (pickupLocation!.latitude + dropoffLocation!.latitude) / 2,
-                            (pickupLocation!.longitude + dropoffLocation!.longitude) / 2,
+                            (_pickupLocation!.latitude + _dropoffLocation!.latitude) / 2,
+                            (_pickupLocation!.longitude + _dropoffLocation!.longitude) / 2,
                           ),
                           zoom: 12,
                         ),
                         markers: {
                           Marker(
                             markerId: const MarkerId('pickup'),
-                            position: pickupLocation!,
+                            position: _pickupLocation!,
                             icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
                             infoWindow: const InfoWindow(title: 'Pickup'),
                           ),
                           Marker(
                             markerId: const MarkerId('dropoff'),
-                            position: dropoffLocation!,
+                            position: _dropoffLocation!,
                             icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
                             infoWindow: const InfoWindow(title: 'Dropoff'),
                           ),
@@ -430,7 +442,7 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                         polylines: {
                           Polyline(
                             polylineId: const PolylineId('route'),
-                            points: [pickupLocation!, dropoffLocation!],
+                            points: [_pickupLocation!, _dropoffLocation!],
                             color: Colors.blue,
                             width: 5,
                           ),
@@ -457,7 +469,8 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                 const SizedBox(height: 16),
                 Text('Recipient Information', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
                 const SizedBox(height: 8),
-                const TextField(
+                 TextField(
+                  controller: recipientNameController,
                   decoration: InputDecoration(
                     labelText: 'Recipient Name',
                     border: OutlineInputBorder(),
@@ -465,7 +478,8 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const TextField(
+                 TextField(
+                  controller: recipientPhoneController,
                   decoration: InputDecoration(
                     labelText: 'Recipient Phone',
                     border: OutlineInputBorder(),
@@ -477,7 +491,8 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                 const SizedBox(height: 16),
                 Text('Delivery Instructions (Optional)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
                 const SizedBox(height: 8),
-                const TextField(
+                 TextField(
+                  controller: instructionsController,
                   decoration: InputDecoration(
                     hintText: 'Special instructions for the courier',
                     border: OutlineInputBorder(),
@@ -489,9 +504,9 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (pickupLocation == null || dropoffLocation == null) {
+                  child:ElevatedButton(
+                    onPressed: () async {
+                      if (_pickupLocation == null || _dropoffLocation == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Please select both pickup and dropoff locations'),
@@ -500,14 +515,47 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
                         );
                         return;
                       }
-                      
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Delivery created successfully!'),
-                          backgroundColor: Colors.green,
-                        ),
+
+                      // Get values from text fields
+                      final recipientName = recipientNameController.text.trim();
+                      final recipientPhone = recipientPhoneController.text.trim();
+                      final instructions = instructionsController.text.trim();
+
+                      // (Optionally) Add validation for recipientName and recipientPhone here
+
+                      // Call the API
+                      final resp = await DeliveryService.createDelivery(
+                        pickupLocation: {
+                          'lat': _pickupLocation!.latitude,
+                          'lng': _pickupLocation!.longitude,
+                        },
+                        dropoffLocation: {
+                          'lat': _dropoffLocation!.latitude,
+                          'lng': _dropoffLocation!.longitude,
+                        },
+                        recipientName: recipientName,
+                        recipientPhone: recipientPhone,
+                        instructions: instructions,
                       );
+
+                      if (resp.success) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Delivery created successfully!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        // Reload deliveries!
+                        await _loadDeliveries();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(resp.error ?? 'Failed to create delivery'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     },
                     style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
                     child: const Text('Create Delivery'),

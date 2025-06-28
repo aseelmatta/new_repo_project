@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:frontend/services/auth_service.dart';
+
 
 class CourierProfilePage extends StatefulWidget {
   const CourierProfilePage({super.key});
@@ -193,17 +195,18 @@ class _CourierProfilePageState extends State<CourierProfilePage> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Implement logout logic
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Logged out successfully')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Logout', style: TextStyle(color: Colors.white)),
-          ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(context); // Close the dialog first
+            await AuthService.logout(); // Actually log out
+            // Optionally navigate to welcome/login page
+            Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+            // Or if you use a widget: 
+            // Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => WelcomePage()), (route) => false);
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          child: const Text('Logout', style: TextStyle(color: Colors.white)),
+        ),
         ],
       ),
     );

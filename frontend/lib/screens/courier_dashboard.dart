@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:math' as math;
 import '../models/delivery.dart';
-import '../services/mock_delivery_service.dart';
+import '../services/delivery_service.dart';
 import 'courier_history_page.dart';
 import 'courier_profile_page.dart';
 
@@ -14,7 +14,7 @@ class CourierDashboard extends StatefulWidget {
 }
 
 class _CourierDashboardState extends State<CourierDashboard> {
-  final MockDeliveryService _deliveryService = MockDeliveryService();
+  
   List<Delivery> _allDeliveries = [];
   List<Delivery> _availableDeliveries = [];
   List<Delivery> _myDeliveries = [];
@@ -42,11 +42,28 @@ class _CourierDashboardState extends State<CourierDashboard> {
     super.dispose();
   }
 
-  void _loadDeliveries() {
-    _allDeliveries = _deliveryService.getMockDeliveries();
+  Future<void> _loadDeliveries() async {
+    // 1. Fetch all deliveries from the backend
+    final resp = await DeliveryService.getDeliveries();
+
+    // 2. If there was an error, show it and stop
+    if (!resp.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading deliveries: ${resp.error}')),
+      );
+      return;
+    }
+
+    // 3. Update the full list in state
+    setState(() {
+      _allDeliveries = resp.data!;
+    });
+
+    // 4. Filter by your operational radius and pick a recommendation
     _filterDeliveriesByRadius();
     _findRecommendedDelivery();
   }
+
 
   void _filterDeliveriesByRadius() {
     setState(() {

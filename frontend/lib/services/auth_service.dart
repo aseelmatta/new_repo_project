@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+//import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 class AuthService {
   // Update this with your actual backend URL
@@ -97,62 +97,62 @@ class AuthService {
   }
 
   // Facebook Sign In
-  static Future<AuthResult> signInWithFacebook() async {
-    try {
-      final LoginResult result = await FacebookAuth.instance.login();
+  // static Future<AuthResult> signInWithFacebook() async {
+  //   try {
+  //     final LoginResult result = await FacebookAuth.instance.login();
       
-      if (result.status != LoginStatus.success) {
-        return AuthResult(success: false, error: 'Facebook login failed');
-      }
+  //     if (result.status != LoginStatus.success) {
+  //       return AuthResult(success: false, error: 'Facebook login failed');
+  //     }
 
-      final AccessToken accessToken = result.accessToken!;
+  //     final AccessToken accessToken = result.accessToken!;
       
-      // Create Firebase credential
-      final credential = FacebookAuthProvider.credential(accessToken.tokenString);
+  //     // Create Firebase credential
+  //     final credential = FacebookAuthProvider.credential(accessToken.tokenString);
       
-      // Sign in to Firebase
-      final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
-      final User? user = userCredential.user;
+  //     // Sign in to Firebase
+  //     final UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
+  //     final User? user = userCredential.user;
       
-      if (user == null) {
-        return AuthResult(success: false, error: 'Failed to sign in with Facebook');
-      }
+  //     if (user == null) {
+  //       return AuthResult(success: false, error: 'Failed to sign in with Facebook');
+  //     }
 
-      // Get Firebase ID token
-      final String? idToken = await user.getIdToken();
+  //     // Get Firebase ID token
+  //     final String? idToken = await user.getIdToken();
       
-      // Send to backend
-      final response = await http.post(
-        Uri.parse('$API_BASE_URL/auth/facebook'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'access_token': accessToken.tokenString,
-          'id_token': idToken,
-        }),
-      );
+  //     // Send to backend
+  //     final response = await http.post(
+  //       Uri.parse('$API_BASE_URL/auth/facebook'),
+  //       headers: {'Content-Type': 'application/json'},
+  //       body: json.encode({
+  //         'access_token': accessToken.tokenString,
+  //         'id_token': idToken,
+  //       }),
+  //     );
 
-      if (response.statusCode == 200) {
-        await saveToken(idToken!);
-        await saveUid(user.uid);
+  //     if (response.statusCode == 200) {
+  //       await saveToken(idToken!);
+  //       await saveUid(user.uid);
         
-        return AuthResult(
-          success: true,
-          userData: {
-            'uid': user.uid,
-            'email': user.email,
-            'displayName': user.displayName,
-            'photoURL': user.photoURL,
-          },
-          token: idToken,
-        );
-      } else {
-        return AuthResult(success: false, error: 'Backend authentication failed');
-      }
-    } catch (e) {
-      print('Facebook sign in error: $e');
-      return AuthResult(success: false, error: 'Facebook sign in failed: $e');
-    }
-  }
+  //       return AuthResult(
+  //         success: true,
+  //         userData: {
+  //           'uid': user.uid,
+  //           'email': user.email,
+  //           'displayName': user.displayName,
+  //           'photoURL': user.photoURL,
+  //         },
+  //         token: idToken,
+  //       );
+  //     } else {
+  //       return AuthResult(success: false, error: 'Backend authentication failed');
+  //     }
+  //   } catch (e) {
+  //     print('Facebook sign in error: $e');
+  //     return AuthResult(success: false, error: 'Facebook sign in failed: $e');
+  //   }
+  // }
 
   // Save authentication token
   static Future<void> saveToken(String token) async {
@@ -196,7 +196,7 @@ class AuthService {
     // Sign out from Firebase and social providers
     await _firebaseAuth.signOut();
     await _googleSignIn.signOut();
-    await FacebookAuth.instance.logOut();
+    //await FacebookAuth.instance.logOut();
   }
   
   // Verify token with backend

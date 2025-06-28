@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/delivery.dart';
-import '../services/mock_delivery_service.dart';
+import '../services/delivery_service.dart';
 
 class BusinessHistoryPage extends StatefulWidget {
   const BusinessHistoryPage({super.key});
@@ -10,7 +10,7 @@ class BusinessHistoryPage extends StatefulWidget {
 }
 
 class _BusinessHistoryPageState extends State<BusinessHistoryPage> {
-  final MockDeliveryService _deliveryService = MockDeliveryService();
+
   List<Delivery> _deliveries = [];
   String _searchQuery = '';
   String _statusFilter = 'all';
@@ -22,15 +22,17 @@ class _BusinessHistoryPageState extends State<BusinessHistoryPage> {
     _loadDeliveries();
   }
 
-  void _loadDeliveries() {
+  Future<void> _loadDeliveries() async {
+    final resp = await DeliveryService.getDeliveries();
+    final all = resp.success ? resp.data! : <Delivery>[];
+    final history = all
+        .where((d) => d.status == 'completed' || d.status == 'cancelled')
+        .toList();
     setState(() {
-      // Filter to only show completed and cancelled deliveries for history
-      _deliveries = _deliveryService.getMockDeliveries()
-          .where((delivery) => 
-              delivery.status == 'completed' || delivery.status == 'cancelled')
-          .toList();
+      _deliveries = history;
     });
   }
+
 
   List<Delivery> get _filteredDeliveries {
     var filtered = _deliveries.where((delivery) {

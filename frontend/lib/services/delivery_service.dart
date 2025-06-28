@@ -14,6 +14,9 @@ class DeliveryService {
     required String recipientPhone,
     String instructions = '',
   }) async {
+      print('🛠️ createDelivery() called with: '
+        'pickup=$pickupLocation, dropoff=$dropoffLocation, '
+        'recipient=$recipientName');
     try {
       String? token = await AuthService.getToken();
       if (token == null) {
@@ -48,9 +51,11 @@ class DeliveryService {
         }
         return ApiResponse.error(responseData['error'] ?? 'Failed to create delivery');
       }
+      print('🛠️ createDelivery() HTTP ${response.statusCode}: ${response.body}');
       return ApiResponse.error('Failed to create delivery');
+      
     } catch (e) {
-      print('Create delivery error: $e');
+      print('❌ createDelivery error: $e');
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -58,6 +63,8 @@ class DeliveryService {
   // Get all deliveries for the current user
   static Future<ApiResponse<List<Delivery>>> getDeliveries() async {
     try {
+      print('▶️ getDeliveries calling GET $API_BASE_URL/getDeliveries');
+
       String? token = await AuthService.getToken();
       if (token == null) {
         return ApiResponse.error('Authentication required');
@@ -70,6 +77,7 @@ class DeliveryService {
           'Content-Type': 'application/json',
         },
       );
+      print('◀️ getDeliveries response ${response.statusCode}: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -127,7 +135,7 @@ class DeliveryService {
       }
 
       final response = await http.put(
-        Uri.parse('$API_BASE_URL/updateDeliveryStatus/$deliveryId'),
+        Uri.parse('$API_BASE_URL/updateDelivery/$deliveryId'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',

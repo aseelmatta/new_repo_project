@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:frontend/screens/welcome_page.dart';
+import 'package:frontend/services/auth_service.dart';
+
 
 class BusinessProfilePage extends StatefulWidget {
   const BusinessProfilePage({super.key});
@@ -130,11 +133,13 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              // TODO: Implement logout logic
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Logged out successfully')),
+            onPressed: () async {
+              Navigator.pop(context); // Close the dialog first (optional, but looks better)
+              await AuthService.logout(); // Actually log out
+              // Now send user to the welcome/login page and clear the stack
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => WelcomePage()), // Replace with your welcome/login page widget
+                (route) => false,
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),

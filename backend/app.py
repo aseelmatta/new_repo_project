@@ -1,5 +1,7 @@
 # app.py
 
+from firebase_admin import auth as firebase_auth
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
@@ -21,55 +23,105 @@ def health():
 # PROFILE ENDPOINTS
 #-----------------------
 @app.route('/createUserProfile', methods=['POST'])
-#@require_token
+@require_token
 def create_user_profile():
     try:
         data = request.get_json()
+        print('DATA RECEIVED AT /createUserProfile:', data)
         if not data:
             return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
 
-        # Expected fields in JSON: role (required), displayName (optional), phone (optional)
         role = data.get('role')
         display_name = data.get('displayName')
         phone = data.get('phone')
 
         if role not in ('business', 'courier'):
-            return jsonify({'success': False, 'error': 'Invalid or missing role'}), 400
+            return jsonify({'success': False, 'error': 'Invalid or missing role'}), 401
 
-        # Get the authenticated user's UID:
         uid = request.uid
-        #uid = 'TEST_UID'   # same dummy ID
-        # Also you can grab email from token if you like: decoded token’s "email"
-        # But for simplicity, let’s store whatever Flutter passes:
-        email = data.get('email')  # optional
+        email = data.get('email')
 
         user_doc_ref = db.collection('users').document(uid)
-        # Check if profile already exists
-        if user_doc_ref.get().exists:
-            return jsonify({'success': False, 'error': 'Profile already exists'}), 400
 
         # Build the profile dict
         profile = {
             'role': role,
+            'displayName': display_name,
+            'email': email,
+            'phone': phone,
         }
-        if display_name:
-            profile['displayName'] = display_name
-        if email:
-            profile['email'] = email
-        if phone:
-            profile['phone'] = phone
+        # Merge in all extra fields from Flutter, unless already set above
+        for key, value in data.items():
+            if key not in profile or not profile[key]:
+                profile[key] = value
 
-        # Save to Firestore
-        user_doc_ref.set(profile)
+        # Save to Firestore (merges if doc exists, creates if not)
+        user_doc_ref.set(profile, merge=True)
 
         return jsonify({'success': True}), 201
 
     except Exception as e:
+        import traceback
+        print('EXCEPTION IN /createUserProfile:', e)
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# @app.route('/createUserProfile', methods=['POST'])
+# @require_token
+# def create_user_profile():
+#     try:
+#         data = request.get_json()
+#         print('DATA RECEIVED AT /createUserProfile:', data)
+#         if not data:
+#             return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
+
+#         # Expected fields in JSON: role (required), displayName (optional), phone (optional)
+#         role = data.get('role')
+#         display_name = data.get('displayName')
+#         phone = data.get('phone')
+
+#         if role not in ('business', 'courier'):
+#             return jsonify({'success': False, 'error': 'Invalid or missing role'}), 401
+
+#         # Get the authenticated user's UID:
+#         uid = request.uid
+#         #uid = 'TEST_UID'   # same dummy ID
+#         # Also you can grab email from token if you like: decoded token’s "email"
+#         # But for simplicity, let’s store whatever Flutter passes:
+#         email = data.get('email')  # optional
+
+#         user_doc_ref = db.collection('users').document(uid)
+#         # Check if profile already exists
+#         # if user_doc_ref.get().exists:
+#         #     return jsonify({'success': False, 'error': 'Profile already exists'}), 402
+#         # If the profile exists, merge/update it. If not, create it.
+#         user_doc_ref.set(profile, merge=True)
+
+#         # Build the profile dict
+#         profile = {
+#             'role': role,
+#         }
+#         if display_name:
+#             profile['displayName'] = display_name
+#         if email:
+#             profile['email'] = email
+#         if phone:
+#             profile['phone'] = phone
+
+#         # Save to Firestore
+#         user_doc_ref.set(profile)
+
+#         return jsonify({'success': True}), 201
+
+#     except Exception as e:
+#          import traceback
+#          print('EXCEPTION IN /createUserProfile:', e)
+#          traceback.print_exc()
+#          return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/getUserProfile', methods=['GET'])
-#@require_token
+@require_token
 def get_user_profile():
     try:
         uid = request.uid
@@ -89,7 +141,7 @@ def get_user_profile():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/updateUserProfile', methods=['PUT'])
-##@require_token
+@require_token
 def update_user_profile():
     try:
         data = request.get_json()
@@ -131,7 +183,7 @@ def update_user_profile():
 # ------------------------
 
 @app.route('/getOrders', methods=['GET'])
-#@require_token
+@require_token
 def get_orders():
     try:
         orders_ref = db.collection('orders')
@@ -149,7 +201,7 @@ def get_orders():
 
 
 @app.route('/getOrder/<order_id>', methods=['GET'])
-#@require_token
+@require_token
 def get_order(order_id):
     try:
         doc_ref = db.collection('orders').document(order_id)
@@ -165,7 +217,7 @@ def get_order(order_id):
 
 
 @app.route('/createOrder', methods=['POST'])
-#@require_token
+@require_token
 def create_order():
     try:
         data = request.get_json()
@@ -197,7 +249,7 @@ def create_order():
 
 
 @app.route('/updateOrder/<order_id>', methods=['PUT'])
-#@require_token
+@require_token
 def update_order(order_id):
     try:
         data = request.get_json()
@@ -232,7 +284,7 @@ def update_order(order_id):
 
 
 @app.route('/deleteOrder/<order_id>', methods=['DELETE'])
-#@require_token
+@require_token
 def delete_order(order_id):
     try:
         doc_ref = db.collection('orders').document(order_id)
@@ -251,7 +303,7 @@ def delete_order(order_id):
 # ------------------------
 
 @app.route('/getCarriers', methods=['GET'])
-#@require_token
+@require_token
 def get_carriers():
     try:
         carriers_ref = db.collection('carriers')
@@ -267,7 +319,7 @@ def get_carriers():
 
 
 @app.route('/getCarrier/<carrier_id>', methods=['GET'])
-#@require_token
+@require_token
 def get_carrier(carrier_id):
     try:
         doc_ref = db.collection('carriers').document(carrier_id)
@@ -283,7 +335,7 @@ def get_carrier(carrier_id):
 
 
 @app.route('/createCarrier', methods=['POST'])
-#@require_token
+@require_token
 def create_carrier():
     try:
         data = request.get_json()
@@ -306,7 +358,7 @@ def create_carrier():
 
 
 @app.route('/updateCarrier/<carrier_id>', methods=['PUT'])
-#@require_token
+@require_token
 def update_carrier(carrier_id):
     try:
         data = request.get_json()
@@ -337,7 +389,7 @@ def update_carrier(carrier_id):
 
 
 @app.route('/deleteCarrier/<carrier_id>', methods=['DELETE'])
-#@require_token
+@require_token
 def delete_carrier(carrier_id):
     try:
         doc_ref = db.collection('carriers').document(carrier_id)
@@ -356,7 +408,7 @@ def delete_carrier(carrier_id):
 # ------------------------
 
 @app.route('/getBusinesses', methods=['GET'])
-#@require_token
+@require_token
 def get_businesses():
     try:
         businesses_ref = db.collection('businesses')
@@ -372,7 +424,7 @@ def get_businesses():
 
 
 @app.route('/getBusiness/<business_id>', methods=['GET'])
-#@require_token
+@require_token
 def get_business(business_id):
     try:
         doc_ref = db.collection('businesses').document(business_id)
@@ -388,7 +440,7 @@ def get_business(business_id):
 
 
 @app.route('/createBusiness', methods=['POST'])
-#@require_token
+@require_token
 def create_business():
     try:
         data = request.get_json()
@@ -411,7 +463,7 @@ def create_business():
 
 
 @app.route('/updateBusiness/<business_id>', methods=['PUT'])
-#@require_token
+@require_token
 def update_business(business_id):
     try:
         data = request.get_json()
@@ -442,7 +494,7 @@ def update_business(business_id):
 
 
 @app.route('/deleteBusiness/<business_id>', methods=['DELETE'])
-#@require_token
+@require_token
 def delete_business(business_id):
     try:
         doc_ref = db.collection('businesses').document(business_id)
@@ -460,7 +512,7 @@ def delete_business(business_id):
 # === DELIVERY ROUTES START HERE ===
 
 @app.route('/updateLocation', methods=['PUT'])
-#@require_token
+@require_token
 def update_location():
     data = request.get_json() or {}
     lat = data.get('lat')
@@ -468,8 +520,8 @@ def update_location():
     if lat is None or lng is None:
         return jsonify({'success': False, 'error': 'Missing lat or lng'}), 400
 
-    uid = 'test_uid'
-    #uid = request.uid
+   #uid = 'test_uid'
+    uid = request.uid
     db.collection('courier_locations').document(uid).set({
         'lat': lat,
         'lng': lng,
@@ -479,7 +531,7 @@ def update_location():
 
 
 @app.route('/createDelivery', methods=['POST'])
-#@require_token
+@require_token
 def create_delivery():
     data = request.get_json() or {}
     pickup = data.get('pickupLocation')
@@ -497,8 +549,8 @@ def create_delivery():
     if not recipient_phone:
         return jsonify({'success': False, 'error': 'Missing recipientPhone'}), 400
 
-    #uid = request.uid
-    uid = 'test_uid'
+    uid = request.uid
+    #uid = 'test_uid'
     delivery_data = {
         'pickupLocation': {'lat': pickup['lat'], 'lng': pickup['lng']},
         'dropoffLocation': {'lat': dropoff['lat'], 'lng': dropoff['lng']},
@@ -612,6 +664,97 @@ def update_delivery_status(delivery_id):
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+#---------------------------------------------------
+#GOOGLE AND FACEBOOK 
+#----------------------------------------------------
+@app.route('/auth/google', methods=['POST'])
+def auth_google():
+    data = request.get_json() or {}
+    print('GOT DATA:', data)
+    id_token = data.get('id_token')
+    if not id_token:
+        return jsonify({'success': False, 'error': 'Missing id_token'}), 400
+
+    try:
+        # Verify the Firebase ID token
+        decoded = firebase_auth.verify_id_token(id_token)
+        uid = decoded['uid']
+
+        # (Optional) Create or update a Firestore profile document
+        user_ref = db.collection('users').document(uid)
+        update_data = {}
+        if decoded.get('email'):
+            update_data['email'] = decoded['email']
+        pic = decoded.get('picture')
+        if pic:
+            update_data['photoURL'] = pic
+        # note: we skip 'name' entirely to preserve your chosen displayName
+
+        if update_data:
+            # use update() so we don’t wipe out fields not in update_data
+            user_ref.set(update_data,merge=True)
+
+
+        return jsonify({'success': True, 'uid': uid}), 200
+
+    except Exception as e:
+        print('GOOGLE AUTH ERROR:', e)
+        return jsonify({'success': False, 'error': str(e)}), 401
+
+@app.route('/auth/facebook', methods=['POST'])
+def auth_facebook():
+    data = request.get_json() or {}
+    id_token = data.get('id_token')
+    if not id_token:
+        return jsonify({'success': False, 'error': 'Missing id_token'}), 400
+
+    try:
+        decoded = firebase_auth.verify_id_token(id_token)
+        uid = decoded['uid']
+
+        user_doc = db.collection('users').document(uid)
+        user_doc.set({
+            'email': decoded.get('email'),
+            'displayName': decoded.get('name'),
+            'photoURL': decoded.get('picture')
+        }, merge=True)
+
+        return jsonify({'success': True, 'uid': uid}), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 401
+
+
+
+
+
+
+#---------------------------------------------------------------------------------------------------
+#
+
+################################ALIAS####################################
+
+
+#-----------------------------------------------------------------------------------------------------
+# Alias for fetching orders as “deliveries”
+@app.route('/getDeliveries', methods=['GET'])
+def get_deliveries_alias():
+    return get_orders()  # call the original handler
+
+# Alias for creating an order as “delivery”
+@app.route('/createDelivery', methods=['POST'])
+def create_delivery_alias():
+    return create_order()  # call the original handler
+
+# Alias for updating an order as “delivery”
+@app.route('/updateDelivery/<id>', methods=['PUT'])
+def update_delivery_alias(id):
+    return update_order(id)  # pass through to the order-updater
+
+# Alias for deleting an order as “delivery”
+@app.route('/deleteDelivery/<id>', methods=['DELETE'])
+def delete_delivery_alias(id):
+    return delete_order(id)  # pass through to the order-deleter
 
 
 # ------------------------
