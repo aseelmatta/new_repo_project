@@ -6,6 +6,10 @@ import '../services/delivery_service.dart';
 import 'courier_history_page.dart';
 import 'courier_profile_page.dart';
 
+import 'dart:async';                  // for StreamSubscription
+import 'package:geolocator/geolocator.dart';
+
+
 class CourierDashboard extends StatefulWidget {
   const CourierDashboard({super.key});
 
@@ -14,14 +18,18 @@ class CourierDashboard extends StatefulWidget {
 }
 
 class _CourierDashboardState extends State<CourierDashboard> {
+  DateTime _lastSentToServer = DateTime.fromMillisecondsSinceEpoch(0);
   
+
   List<Delivery> _allDeliveries = [];
   List<Delivery> _availableDeliveries = [];
   List<Delivery> _myDeliveries = [];
   bool _showMapView = false;
   String _courierStatus = 'available';
   GoogleMapController? _mapController;
-  final LatLng _courierLocation = const LatLng(37.4219999, -122.0840575); // Mock location
+  LatLng _courierLocation = const LatLng(37.4219999, -122.0840575);
+  StreamSubscription<Position>? _positionSub;
+
   double _operationalRadius = 5.0; // in kilometers
   Set<Circle> _circles = {};
   Delivery? _recommendedDelivery;
@@ -34,13 +42,60 @@ class _CourierDashboardState extends State<CourierDashboard> {
     _pageController = PageController();
     _loadDeliveries();
     _updateOperationalAreaCircle();
+    _startLocationUpdates();
   }
 
   @override
   void dispose() {
+    _positionSub?.cancel();
     _pageController?.dispose();
     super.dispose();
   }
+  
+  Future<void> _startLocationUpdates() async {
+    // 1. Request permission
+    LocationPermission perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.deniedForever ||
+          perm == LocationPermission.denied) {
+        // handle appropriately (show dialog, disable map, etc.)
+        return;
+      }
+    }
+
+    // 2. Subscribe to position updates
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 50,      // only fire when moved ≥50m
+      ),
+    ).listen(_onPositionUpdate, onError: (err) => print("Loc error: $err"));
+
+  }
+
+  void _onPositionUpdate(Position pos) {
+  final newLoc = LatLng(pos.latitude, pos.longitude);
+
+    // Always update the UI immediately:
+    setState(() {
+      _courierLocation = newLoc;
+      _updateOperationalAreaCircle();
+      _filterDeliveriesByRadius();
+      _findRecommendedDelivery();
+    });
+
+    // But only call the backend at most once every 10s:
+    final now = DateTime.now();
+    if (now.difference(_lastSentToServer) < Duration(seconds: 10)) return;
+    _lastSentToServer = now;
+
+    DeliveryService.updateLocation(pos.latitude, pos.longitude)
+      .then((resp) {
+        if (!resp.success) print("Failed to update location: ${resp.error}");
+      });
+  }
+
 
   Future<void> _loadDeliveries() async {
     // 1. Fetch all deliveries from the backend
@@ -74,7 +129,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
           delivery.pickupLocation.latitude,
           delivery.pickupLocation.longitude,
         );
-        return distance <= _operationalRadius && delivery.status == 'pending';
+        return distance <= _operationalRadius && delivery.status == 'pending'|| delivery.status == 'accepted';
       }).toList();
     });
   }

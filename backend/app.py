@@ -65,60 +65,7 @@ def create_user_profile():
         print('EXCEPTION IN /createUserProfile:', e)
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-
-# @app.route('/createUserProfile', methods=['POST'])
-# @require_token
-# def create_user_profile():
-#     try:
-#         data = request.get_json()
-#         print('DATA RECEIVED AT /createUserProfile:', data)
-#         if not data:
-#             return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
-
-#         # Expected fields in JSON: role (required), displayName (optional), phone (optional)
-#         role = data.get('role')
-#         display_name = data.get('displayName')
-#         phone = data.get('phone')
-
-#         if role not in ('business', 'courier'):
-#             return jsonify({'success': False, 'error': 'Invalid or missing role'}), 401
-
-#         # Get the authenticated user's UID:
-#         uid = request.uid
-#         #uid = 'TEST_UID'   # same dummy ID
-#         # Also you can grab email from token if you like: decoded token’s "email"
-#         # But for simplicity, let’s store whatever Flutter passes:
-#         email = data.get('email')  # optional
-
-#         user_doc_ref = db.collection('users').document(uid)
-#         # Check if profile already exists
-#         # if user_doc_ref.get().exists:
-#         #     return jsonify({'success': False, 'error': 'Profile already exists'}), 402
-#         # If the profile exists, merge/update it. If not, create it.
-#         user_doc_ref.set(profile, merge=True)
-
-#         # Build the profile dict
-#         profile = {
-#             'role': role,
-#         }
-#         if display_name:
-#             profile['displayName'] = display_name
-#         if email:
-#             profile['email'] = email
-#         if phone:
-#             profile['phone'] = phone
-
-#         # Save to Firestore
-#         user_doc_ref.set(profile)
-
-#         return jsonify({'success': True}), 201
-
-#     except Exception as e:
-#          import traceback
-#          print('EXCEPTION IN /createUserProfile:', e)
-#          traceback.print_exc()
-#          return jsonify({'success': False, 'error': str(e)}), 500
-
+    
 
 @app.route('/getUserProfile', methods=['GET'])
 @require_token
@@ -182,120 +129,120 @@ def update_user_profile():
 # ORDERS ENDPOINTS
 # ------------------------
 
-@app.route('/getOrders', methods=['GET'])
-@require_token
-def get_orders():
-    try:
-        orders_ref = db.collection('orders')
-        docs = orders_ref.stream()
+# @app.route('/getOrders', methods=['GET'])
+# @require_token
+# def get_orders():
+#     try:
+#         orders_ref = db.collection('orders')
+#         docs = orders_ref.stream()
 
-        orders_list = []
-        for doc in docs:
-            o = Order.from_dict(doc.to_dict(), doc.id)
-            orders_list.append({'id': o.id, **o.to_dict()})
+#         orders_list = []
+#         for doc in docs:
+#             o = Order.from_dict(doc.to_dict(), doc.id)
+#             orders_list.append({'id': o.id, **o.to_dict()})
 
-        return jsonify({'success': True, 'orders': orders_list}), 200
+#         return jsonify({'success': True, 'orders': orders_list}), 200
 
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/getOrder/<order_id>', methods=['GET'])
-@require_token
-def get_order(order_id):
-    try:
-        doc_ref = db.collection('orders').document(order_id)
-        doc = doc_ref.get()
-        if not doc.exists:
-            return jsonify({'success': False, 'error': 'Order not found'}), 404
-
-        o = Order.from_dict(doc.to_dict(), doc.id)
-        return jsonify({'success': True, 'order': {'id': o.id, **o.to_dict()}}), 200
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/createOrder', methods=['POST'])
-@require_token
-def create_order():
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
+# @app.route('/getOrder/<order_id>', methods=['GET'])
+# @require_token
+# def get_order(order_id):
+#     try:
+#         doc_ref = db.collection('orders').document(order_id)
+#         doc = doc_ref.get()
+#         if not doc.exists:
+#             return jsonify({'success': False, 'error': 'Order not found'}), 404
 
-        # Required fields: customer (str), items (list)
-        customer = data.get('customer')
-        items = data.get('items')
-        status = data.get('status', 'pending')
-        carrier_id = data.get('carrier_id')
-        business_id = data.get('business_id')
+#         o = Order.from_dict(doc.to_dict(), doc.id)
+#         return jsonify({'success': True, 'order': {'id': o.id, **o.to_dict()}}), 200
 
-        if not customer or items is None:
-            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
-
-        new_order = Order(
-            customer = customer,
-            items = items,
-            status = status,
-            carrier_id = carrier_id,
-            business_id = business_id
-        )
-        _, doc_ref = db.collection('orders').add(new_order.to_dict())
-        return jsonify({'success': True, 'order_id': doc_ref.id}), 201
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/updateOrder/<order_id>', methods=['PUT'])
-@require_token
-def update_order(order_id):
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
+# @app.route('/createOrder', methods=['POST'])
+# @require_token
+# def create_order():
+#     try:
+#         data = request.get_json()
+#         if not data:
+#             return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
 
-        doc_ref = db.collection('orders').document(order_id)
-        snapshot = doc_ref.get()
-        if not snapshot.exists:
-            return jsonify({'success': False, 'error': 'Order not found'}), 404
+#         # Required fields: customer (str), items (list)
+#         customer = data.get('customer')
+#         items = data.get('items')
+#         status = data.get('status', 'pending')
+#         carrier_id = data.get('carrier_id')
+#         business_id = data.get('business_id')
 
-        updates = {}
-        if 'customer' in data:
-            updates['customer'] = data['customer']
-        if 'items' in data:
-            updates['items'] = data['items']
-        if 'status' in data:
-            updates['status'] = data['status']
-        if 'carrier_id' in data:
-            updates['carrier_id'] = data['carrier_id']
-        if 'business_id' in data:
-            updates['business_id'] = data['business_id']
+#         if not customer or items is None:
+#             return jsonify({'success': False, 'error': 'Missing required fields'}), 400
 
-        if not updates:
-            return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
+#         new_order = Order(
+#             customer = customer,
+#             items = items,
+#             status = status,
+#             carrier_id = carrier_id,
+#             business_id = business_id
+#         )
+#         _, doc_ref = db.collection('orders').add(new_order.to_dict())
+#         return jsonify({'success': True, 'order_id': doc_ref.id}), 201
 
-        doc_ref.update(updates)
-        return jsonify({'success': True}), 200
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/deleteOrder/<order_id>', methods=['DELETE'])
-@require_token
-def delete_order(order_id):
-    try:
-        doc_ref = db.collection('orders').document(order_id)
-        if not doc_ref.get().exists:
-            return jsonify({'success': False, 'error': 'Order not found'}), 404
+# @app.route('/updateOrder/<order_id>', methods=['PUT'])
+# @require_token
+# def update_order(order_id):
+#     try:
+#         data = request.get_json()
+#         if not data:
+#             return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
 
-        doc_ref.delete()
-        return jsonify({'success': True}), 200
+#         doc_ref = db.collection('orders').document(order_id)
+#         snapshot = doc_ref.get()
+#         if not snapshot.exists:
+#             return jsonify({'success': False, 'error': 'Order not found'}), 404
 
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+#         updates = {}
+#         if 'customer' in data:
+#             updates['customer'] = data['customer']
+#         if 'items' in data:
+#             updates['items'] = data['items']
+#         if 'status' in data:
+#             updates['status'] = data['status']
+#         if 'carrier_id' in data:
+#             updates['carrier_id'] = data['carrier_id']
+#         if 'business_id' in data:
+#             updates['business_id'] = data['business_id']
+
+#         if not updates:
+#             return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
+
+#         doc_ref.update(updates)
+#         return jsonify({'success': True}), 200
+
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# @app.route('/deleteOrder/<order_id>', methods=['DELETE'])
+# @require_token
+# def delete_order(order_id):
+#     try:
+#         doc_ref = db.collection('orders').document(order_id)
+#         if not doc_ref.get().exists:
+#             return jsonify({'success': False, 'error': 'Order not found'}), 404
+
+#         doc_ref.delete()
+#         return jsonify({'success': True}), 200
+
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ------------------------
@@ -643,7 +590,7 @@ def get_delivery(delivery_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     
-@app.route('/updateDeliveryStatus/<delivery_id>', methods=['PUT'])
+@app.route('/updateDelivery/<delivery_id>', methods=['PUT'])
 @require_token
 def update_delivery_status(delivery_id):
     """
@@ -750,24 +697,24 @@ def auth_facebook():
 
 #-----------------------------------------------------------------------------------------------------
 # Alias for fetching orders as “deliveries”
-@app.route('/getDeliveries', methods=['GET'])
-def get_deliveries_alias():
-    return get_orders()  # call the original handler
+# @app.route('/getDeliveries', methods=['GET'])
+# def get_deliveries_alias():
+#     return get_orders()  # call the original handler
 
-# Alias for creating an order as “delivery”
-@app.route('/createDelivery', methods=['POST'])
-def create_delivery_alias():
-    return create_order()  # call the original handler
+# # Alias for creating an order as “delivery”
+# @app.route('/createDelivery', methods=['POST'])
+# def create_delivery_alias():
+#     return create_order()  # call the original handler
 
-# Alias for updating an order as “delivery”
-@app.route('/updateDelivery/<id>', methods=['PUT'])
-def update_delivery_alias(id):
-    return update_order(id)  # pass through to the order-updater
+# # Alias for updating an order as “delivery”
+# @app.route('/updateDelivery/<id>', methods=['PUT'])
+# def update_delivery_alias(id):
+#     return update_order(id)  # pass through to the order-updater
 
-# Alias for deleting an order as “delivery”
-@app.route('/deleteDelivery/<id>', methods=['DELETE'])
-def delete_delivery_alias(id):
-    return delete_order(id)  # pass through to the order-deleter
+# # Alias for deleting an order as “delivery”
+# @app.route('/deleteDelivery/<id>', methods=['DELETE'])
+# def delete_delivery_alias(id):
+#     return delete_order(id)  # pass through to the order-deleter
 
 
 # ------------------------
