@@ -10,6 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  geolocator: ^9.0.2
+  http: ^1.4.0
+
+
 
   cupertino_icons: ^1.0.8
   google_generative_ai: ^0.4.3 
@@ -23,7 +27,7 @@ dependencies:
   url_launcher: ^6.2.5
   # Maps and Location
   google_maps_flutter: ^2.5.0
-  geolocator: ^12.0.0
+ 
   
   # State Management
   provider: ^6.1.1
@@ -32,8 +36,8 @@ dependencies:
   flutter_svg: ^2.0.9
   cached_network_image: ^3.3.0
   
-  # Networking
-  http: ^1.1.0
+
+
   
   # Authentication - ADD THESE
   google_sign_in: ^6.2.1

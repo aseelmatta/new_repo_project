@@ -126,6 +126,24 @@ class DeliveryService {
     }
   }
 
+
+static Future<void> cancelDelivery(String id, String token) async {
+    print('[Service] DELETE /deleteDelivery/$id');
+    
+    final url = Uri.parse('$API_BASE_URL/deleteDelivery/$id');
+    final response = await http.delete(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token', // if you use tokens
+      },
+    );
+    print('[Service] got ${response.statusCode}: ${response.body}');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to cancel delivery: ${response.statusCode} ${response.body}');
+    }
+  }
+
   // Update delivery status (for couriers)
   static Future<ApiResponse<bool>> updateDeliveryStatus(String deliveryId, String status) async {
     try {
