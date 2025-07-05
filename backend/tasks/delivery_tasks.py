@@ -49,6 +49,14 @@ def match_and_assign_courier(delivery_id):
         lng2 = loc.get('lng')
         if lat2 is None or lng2 is None:
             continue
+
+        active_deliveries = db.collection('deliveries') \
+            .where('assignedCourier', '==', courier_uid) \
+            .where('status', 'in', ['accepted', 'in_progress']) \
+            .stream()
+        delivery_count = sum(1 for _ in active_deliveries)
+        if delivery_count >= 2:
+            continue
         dist = haversine_distance(lat1, lng1, lat2, lng2)
         if best_dist is None or dist < best_dist:
             best_dist = dist
