@@ -8,7 +8,7 @@ class Delivery {
   final String pickupAddress;
   final LatLng dropoffLocation;
   final String dropoffAddress;
-  final String status; // pending, accepted, in_progress, completed, cancelled
+  String status; // pending, accepted, in_progress, completed, cancelled
   final String description;
   
   // Additional fields for backend integration
@@ -144,12 +144,9 @@ class Delivery {
         return 'pending';
       case 'accepted':
         return 'accepted';
-      case 'picked_up':
-      case 'picked up':
-        return 'picked_up';
-      case 'in_transit':
-      case 'in transit':
+      case 'in_progress':
         return 'in_progress';
+      case 'completed':
       case 'delivered':
         return 'completed';
       case 'cancelled':

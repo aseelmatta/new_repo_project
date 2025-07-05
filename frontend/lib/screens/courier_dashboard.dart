@@ -94,38 +94,63 @@ class _CourierDashboardState extends State<CourierDashboard> {
       .then((resp) {
         if (!resp.success) print("Failed to update location: ${resp.error}");
       });
-  }
-      // --- DROP-OFF DETECTION START ---
-    for (var delivery in _allDeliveries) {
-      if (delivery.status == 'in_progress') {
-        final dropDist = _calculateDistance(
-          pos.latitude,
-          pos.longitude,
-          delivery.dropoffLocation.latitude,
-          delivery.dropoffLocation.longitude,
-        );
-        // if within 50 m, mark completed
-        if (dropDist < 0.1) {
-          DeliveryService.updateDeliveryStatus(delivery.id, 'completed')
-            .then((resp) {
-              if (resp.success) {
-                setState(() {
-                  delivery.status = 'completed';
-                  // optionally remove it from the list:
-                  _allDeliveries.removeWhere((d) => d.id == delivery.id);
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Delivery #${delivery.id} completed!')),
-                );
-              }
-            });
-          // break so you don’t fire multiple at once
-          break;
-        }
+       // **reload any newly-assigned jobs**  
+    DeliveryService.getDeliveries().then((resp) {
+      if (resp.success) {
+        setState(() {
+          _allDeliveries = resp.data!;
+        });
+      }
+    });
+        // — PICKUP DETECTION —
+  for (var delivery in _allDeliveries) {
+    if (delivery.status == 'accepted') {
+      final pickupDist = _calculateDistance(
+        pos.latitude, pos.longitude,
+        delivery.pickupLocation.latitude, delivery.pickupLocation.longitude,
+      );
+      if (pickupDist < 0.2) {
+        DeliveryService.updateDeliveryStatus(delivery.id, 'in_progress')
+          .then((resp) {
+            if (resp.success) {
+              setState(() => delivery.status = 'in_progress');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Picked up delivery #${delivery.id}!')),
+              );
+            }
+          });
+        break;
       }
     }
-    // --- DROP-OFF DETECTION END ---
+  }
 
+  // — DROP-OFF DETECTION —
+  for (var delivery in _allDeliveries) {
+    if (delivery.status == 'in_progress') {
+      final dropDist = _calculateDistance(
+        pos.latitude, pos.longitude,
+        delivery.dropoffLocation.latitude, delivery.dropoffLocation.longitude,
+      );
+      if (dropDist < 0.2) {
+        DeliveryService.updateDeliveryStatus(delivery.id, 'completed')
+          .then((resp) {
+            if (resp.success) {
+              setState(() {
+                delivery.status = 'completed';
+                _allDeliveries.removeWhere((d) => d.id == delivery.id);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Completed delivery #${delivery.id}!')),
+              );
+            }
+          });
+        break;
+      }
+    }
+  }
+      
+  }
+  
 
   Future<void> _loadDeliveries() async {
     // 1. Fetch all deliveries from the backend
@@ -159,7 +184,8 @@ class _CourierDashboardState extends State<CourierDashboard> {
           delivery.pickupLocation.latitude,
           delivery.pickupLocation.longitude,
         );
-        return distance <= _operationalRadius && delivery.status == 'pending'|| delivery.status == 'accepted';
+        return distance <= _operationalRadius && delivery.status == 'pending'|| delivery.status == 'accepted'||
+         delivery.status == 'in_progress';
       }).toList();
     });
   }
