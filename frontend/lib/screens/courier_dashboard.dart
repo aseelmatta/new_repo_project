@@ -236,43 +236,43 @@ class _CourierDashboardState extends State<CourierDashboard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Implement accept delivery
-                      setState(() {
-                        _myDeliveries.add(delivery);
-                        _availableDeliveries.remove(delivery);
-                        if (_recommendedDelivery?.id == delivery.id) {
-                          _findRecommendedDelivery();
-                        }
-                      });
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Delivery #${delivery.id} accepted!'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    },
-                    style: isRecommended 
-                      ? ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
-                        )
-                      : ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                        ),
-                    child: Text(
-                      isRecommended ? 'Accept Recommended' : 'Accept Delivery',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
+                // Expanded(
+                //   child: ElevatedButton(
+                //     onPressed: () {
+                //       // Implement accept delivery
+                //       setState(() {
+                //         _myDeliveries.add(delivery);
+                //         _availableDeliveries.remove(delivery);
+                //         if (_recommendedDelivery?.id == delivery.id) {
+                //           _findRecommendedDelivery();
+                //         }
+                //       });
+                //       Navigator.pop(context);
+                //       ScaffoldMessenger.of(context).showSnackBar(
+                //         SnackBar(
+                //           content: Text('Delivery #${delivery.id} accepted!'),
+                //           backgroundColor: Colors.green,
+                //         ),
+                //       );
+                //     },
+                //     style: isRecommended 
+                //       ? ElevatedButton.styleFrom(
+                //           backgroundColor: Colors.amber,
+                //         )
+                //       : ElevatedButton.styleFrom(
+                //           backgroundColor: Colors.green,
+                //         ),
+                //     child: Text(
+                //       isRecommended ? 'Accept Recommended' : 'Accept Delivery',
+                //       style: TextStyle(color: Colors.white),
+                //     ),
+                //   ),
+                // ),
+                // const SizedBox(width: 8),
+                // TextButton(
+                //   onPressed: () => Navigator.pop(context),
+                //   child: const Text('Close'),
+                // ),
               ],
             ),
           ],
@@ -596,15 +596,15 @@ class _CourierDashboardState extends State<CourierDashboard> {
                                     ),
                                   ],
                                 ),
-                                trailing: ElevatedButton(
-                                  onPressed: () => _showDeliveryDetails(delivery),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: isRecommended ? Colors.amber : Colors.green,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  ),
-                                  child: Text(isRecommended ? 'Recommended' : 'View'),
-                                ),
+                                // trailing: ElevatedButton(
+                                //   onPressed: () => _showDeliveryDetails(delivery),
+                                //   style: ElevatedButton.styleFrom(
+                                //     backgroundColor: isRecommended ? Colors.amber : Colors.green,
+                                //     foregroundColor: Colors.white,
+                                //     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                //   ),
+                                //   child: Text(isRecommended ? 'Recommended' : 'View'),
+                                // ),
                                 isThreeLine: true,
                                 onTap: () => _showDeliveryDetails(delivery),
                               ),
