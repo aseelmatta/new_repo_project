@@ -210,6 +210,25 @@ static Future<void> cancelDelivery(String id, String token) async {
       return ApiResponse.error('Network error: $e');
     }
   }
+
+  /// Fetch the current lat/lng for a courier from your backend
+static Future<ApiResponse<Map<String,double>>> getCourierLocation(String courierId) async {
+  final token = await AuthService.getToken();
+  final res = await http.get(
+    Uri.parse('$API_BASE_URL/couriers/$courierId/location'),
+    headers: {'Authorization':'Bearer $token'},
+  );
+  if (res.statusCode == 200) {
+    final data = jsonDecode(res.body);
+    return ApiResponse.success({
+      'lat': (data['latitude'] as num).toDouble(),
+      'lng': (data['longitude'] as num).toDouble(),
+    });
+  } else {
+    return ApiResponse.error('Failed to fetch location');
+  }
+}
+
 }
 
 // Generic API Response class
@@ -223,3 +242,4 @@ class ApiResponse<T> {
   factory ApiResponse.success(T data) => ApiResponse._(success: true, data: data);
   factory ApiResponse.error(String error) => ApiResponse._(success: false, error: error);
 }
+
