@@ -627,8 +627,15 @@ def update_delivery_status(delivery_id):
             'timestampUpdated': firestore.SERVER_TIMESTAMP
         })
 
+        if new_status == 'in_progress':
+            doc_ref.update({
+            'timestampPickedUp' : firestore.SERVER_TIMESTAMP
+            })
         if new_status == 'completed':
-            doc_ref.delete()
+            doc_ref.update({
+            'timestampDelivered': firestore.SERVER_TIMESTAMP
+            })
+
             pending = db.collection('deliveries') \
                 .where('status', '==', 'pending') \
                 .stream()
@@ -719,36 +726,6 @@ def auth_facebook():
         return jsonify({'success': False, 'error': str(e)}), 401
 
 
-
-
-
-
-#---------------------------------------------------------------------------------------------------
-#
-
-################################ALIAS####################################
-
-
-#-----------------------------------------------------------------------------------------------------
-# Alias for fetching orders as “deliveries”
-# @app.route('/getDeliveries', methods=['GET'])
-# def get_deliveries_alias():
-#     return get_orders()  # call the original handler
-
-# # Alias for creating an order as “delivery”
-# @app.route('/createDelivery', methods=['POST'])
-# def create_delivery_alias():
-#     return create_order()  # call the original handler
-
-# # Alias for updating an order as “delivery”
-# @app.route('/updateDelivery/<id>', methods=['PUT'])
-# def update_delivery_alias(id):
-#     return update_order(id)  # pass through to the order-updater
-
-# # Alias for deleting an order as “delivery”
-# @app.route('/deleteDelivery/<id>', methods=['DELETE'])
-# def delete_delivery_alias(id):
-#     return delete_order(id)  # pass through to the order-deleter
 
 
 # ------------------------
