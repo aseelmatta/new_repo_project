@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../models/delivery.dart';
 import '../services/delivery_service.dart';
 import '../services/auth_service.dart';
+import '../services/delivery_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 class DeliveryTrackingPage extends StatefulWidget {
   final Delivery delivery;
@@ -199,6 +203,71 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
     });
   }
 
+
+/// Cancel button handler
+Future<void> _cancelDelivery() async {
+  // 1) Ask user to confirm
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Cancel Delivery?'),
+      content: const Text('Are you sure you want to cancel this delivery?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('No'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Yes'),
+        ),
+      ],
+    ),
+  );
+  if (confirm != true) return;
+
+  // 2) Grab the business/user ID from FirebaseAuth
+  final businessId = FirebaseAuth.instance.currentUser?.uid;
+  if (businessId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You must be logged in to cancel.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+  }
+
+  // 3) Call the service with both required args
+  try {
+    await DeliveryService.cancelDelivery(
+      _currentDelivery.id,  // delivery ID
+      businessId,           // who’s cancelling
+    );
+
+    // 4) Update UI on success
+    setState(() {
+      _currentDelivery = _currentDelivery.copyWith(status: 'cancelled');
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Delivery cancelled'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  } catch (e) {
+    // 5) Show error if it fails
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Cancel failed: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+// ——————————————————————————————————————————————————————————————————————————
+
   void _updateMapElements() {
     Set<Marker> markers = {};
     Set<Polyline> polylines = {};
@@ -388,7 +457,7 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
         title: Row(
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 32),
@@ -415,14 +484,14 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop(); // Go back to dashboard
+              Navigator.pop(context);
+              Navigator.pop(context);
             },
             child: const Text('Later'),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pop();
+              Navigator.pop(context);
               _showRatingDialog();
             },
             child: const Text('Rate Courier'),
@@ -669,12 +738,11 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
                           ),
                         ],
                       ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
           ),
-          
           // Map
           Expanded(
             child: GoogleMap(
@@ -685,9 +753,7 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
               markers: _markers,
               polylines: _polylines,
               circles: _circles,
-              onMapCreated: (GoogleMapController controller) {
-                _mapController = controller;
-              },
+              onMapCreated: (controller) => _mapController = controller,
               myLocationEnabled: false,
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
@@ -777,3 +843,5 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
     );
   }
 }
+
+

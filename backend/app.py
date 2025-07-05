@@ -230,20 +230,6 @@ def update_user_profile():
 #         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-# @app.route('/deleteOrder/<order_id>', methods=['DELETE'])
-# @require_token
-# def delete_order(order_id):
-#     try:
-#         doc_ref = db.collection('orders').document(order_id)
-#         if not doc_ref.get().exists:
-#             return jsonify({'success': False, 'error': 'Order not found'}), 404
-
-#         doc_ref.delete()
-#         return jsonify({'success': True}), 200
-
-#     except Exception as e:
-#         return jsonify({'success': False, 'error': str(e)}), 500
-
 
 # ------------------------
 # CARRIERS ENDPOINTS
@@ -458,6 +444,26 @@ def delete_business(business_id):
 
 # === DELIVERY ROUTES START HERE ===
 
+# NEW: GET endpoint for dashboard to fetch all courier locations
+@app.route('/getCourierLocations', methods=['GET'])
+@require_token
+def get_courier_locations():
+    try:
+        docs = db.collection('courier_locations').stream()
+        locations = []
+        for doc in docs:
+            data = doc.to_dict()
+            locations.append({
+                'id': doc.id,
+                'lat': data.get('lat'),
+                'lng': data.get('lng'),
+                'timestamp': data.get('timestamp').isoformat() if data.get('timestamp') else None
+            })
+        return jsonify({'success': True, 'locations': locations}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/updateLocation', methods=['PUT'])
 @require_token
 def update_location():
@@ -624,6 +630,25 @@ def update_delivery_status(delivery_id):
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+    
+    
+    
+    
+@app.route('/deleteDelivery/<delivery_id>', methods=['DELETE'])
+@require_token
+def delete_delivery(delivery_id):
+    try:
+        doc_ref = db.collection('deliveries').document(delivery_id)
+        if not doc_ref.get().exists:
+            return jsonify({'success': False, 'error': 'delivery not found'}), 404
+
+        doc_ref.delete()
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 #---------------------------------------------------
 #GOOGLE AND FACEBOOK 
 #----------------------------------------------------
