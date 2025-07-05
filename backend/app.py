@@ -626,6 +626,15 @@ def update_delivery_status(delivery_id):
             'status': new_status,
             'timestampUpdated': firestore.SERVER_TIMESTAMP
         })
+
+        if new_status == 'completed':
+            doc_ref.delete()
+            pending = db.collection('deliveries') \
+                .where('status', '==', 'pending') \
+                .stream()
+            for p in pending:
+                match_and_assign_courier.delay(p.id)
+
         return jsonify({'success': True}), 200
 
     except Exception as e:

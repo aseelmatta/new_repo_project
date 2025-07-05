@@ -95,6 +95,36 @@ class _CourierDashboardState extends State<CourierDashboard> {
         if (!resp.success) print("Failed to update location: ${resp.error}");
       });
   }
+      // --- DROP-OFF DETECTION START ---
+    for (var delivery in _allDeliveries) {
+      if (delivery.status == 'in_progress') {
+        final dropDist = _calculateDistance(
+          pos.latitude,
+          pos.longitude,
+          delivery.dropoffLocation.latitude,
+          delivery.dropoffLocation.longitude,
+        );
+        // if within 50 m, mark completed
+        if (dropDist < 0.1) {
+          DeliveryService.updateDeliveryStatus(delivery.id, 'completed')
+            .then((resp) {
+              if (resp.success) {
+                setState(() {
+                  delivery.status = 'completed';
+                  // optionally remove it from the list:
+                  _allDeliveries.removeWhere((d) => d.id == delivery.id);
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Delivery #${delivery.id} completed!')),
+                );
+              }
+            });
+          // break so you don’t fire multiple at once
+          break;
+        }
+      }
+    }
+    // --- DROP-OFF DETECTION END ---
 
 
   Future<void> _loadDeliveries() async {
