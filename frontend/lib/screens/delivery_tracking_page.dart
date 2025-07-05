@@ -8,6 +8,8 @@ import '../models/delivery.dart';
 import '../services/delivery_service.dart';
 import '../services/auth_service.dart';
 import '../services/delivery_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 class DeliveryTrackingPage extends StatefulWidget {
   final Delivery delivery;
@@ -200,6 +202,71 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
       }
     });
   }
+
+
+/// Cancel button handler
+Future<void> _cancelDelivery() async {
+  // 1) Ask user to confirm
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Cancel Delivery?'),
+      content: const Text('Are you sure you want to cancel this delivery?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('No'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Yes'),
+        ),
+      ],
+    ),
+  );
+  if (confirm != true) return;
+
+  // 2) Grab the business/user ID from FirebaseAuth
+  final businessId = FirebaseAuth.instance.currentUser?.uid;
+  if (businessId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You must be logged in to cancel.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+  }
+
+  // 3) Call the service with both required args
+  try {
+    await DeliveryService.cancelDelivery(
+      _currentDelivery.id,  // delivery ID
+      businessId,           // who’s cancelling
+    );
+
+    // 4) Update UI on success
+    setState(() {
+      _currentDelivery = _currentDelivery.copyWith(status: 'cancelled');
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Delivery cancelled'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  } catch (e) {
+    // 5) Show error if it fails
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Cancel failed: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+// ——————————————————————————————————————————————————————————————————————————
 
   void _updateMapElements() {
     Set<Marker> markers = {};
@@ -776,3 +843,5 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
     );
   }
 }
+
+
