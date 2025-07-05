@@ -14,7 +14,7 @@ from google.cloud import firestore
 from tasks.delivery_tasks import match_and_assign_courier
 
 app = Flask(__name__)
-CORS(app)  # allow cross‐origin requests (useful during development)
+CORS(app)  
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"success": True, "status": "ok"}), 200
