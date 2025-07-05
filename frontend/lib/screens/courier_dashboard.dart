@@ -51,7 +51,40 @@ class _CourierDashboardState extends State<CourierDashboard> {
     _pageController?.dispose();
     super.dispose();
   }
-  
+  // HELPER METHOD FOR CONSISTENT DETAIL ROWS
+  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 8.0),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+              fontSize: 14,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: valueColor ?? Colors.black87,
+              fontSize: 14,
+              fontWeight: valueColor != null ? FontWeight.bold : FontWeight.normal,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 3, // Allow up to 3 lines for longer addresses
+          ),
+        ),
+      ],
+    ),
+  );
+}
   Future<void> _startLocationUpdates() async {
     // 1. Request permission
     LocationPermission perm = await Geolocator.checkPermission();
@@ -115,7 +148,22 @@ class _CourierDashboardState extends State<CourierDashboard> {
             if (resp.success) {
               setState(() => delivery.status = 'in_progress');
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Picked up delivery #${delivery.id}!')),
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Picked up delivery #${delivery.id}!',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                ),
               );
             }
           });
@@ -140,7 +188,22 @@ class _CourierDashboardState extends State<CourierDashboard> {
                 _allDeliveries.removeWhere((d) => d.id == delivery.id);
               });
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Completed delivery #${delivery.id}!')),
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.celebration, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Completed delivery #${delivery.id}!',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                ),
               );
             }
           });
@@ -246,96 +309,116 @@ class _CourierDashboardState extends State<CourierDashboard> {
     });
   }
 
-  void _showDeliveryDetails(Delivery delivery) {
-    bool isRecommended = _recommendedDelivery?.id == delivery.id;
-    
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        height: MediaQuery.of(context).size.height * 0.7,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text('Delivery Details', style: Theme.of(context).textTheme.headlineSmall),
-                if (isRecommended) const SizedBox(width: 8),
-                if (isRecommended)
-                  Tooltip(
+void _showDeliveryDetails(Delivery delivery) {
+  bool isRecommended = _recommendedDelivery?.id == delivery.id;
+  
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => Container(
+      padding: const EdgeInsets.all(16),
+      height: MediaQuery.of(context).size.height * 0.7,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // FIX: Prevent header overflow
+          Row(
+            children: [
+              // FIX: Use Expanded to prevent text overflow
+              Expanded(
+                flex: 3,
+                child: Text(
+                  'Delivery Details',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              if (isRecommended) const SizedBox(width: 8),
+              if (isRecommended)
+                Flexible(
+                  child: Tooltip(
                     message: 'Recommended delivery based on your location',
                     child: Icon(Icons.stars, color: Colors.amber),
                   ),
-              ],
+                ),
+            ],
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // FIX: Add delivery ID with proper overflow handling
+          Row(
+            children: [
+              Text(
+                'ID: ',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]),
+              ),
+              Expanded(
+                child: Text(
+                  '#${delivery.id}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700],
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Make the content scrollable to prevent bottom overflow
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // FIX: Use helper method for consistent formatting
+                  _buildDetailRow('Pickup:', delivery.pickupAddress),
+                  _buildDetailRow('Dropoff:', delivery.dropoffAddress),
+                  _buildDetailRow('Description:', delivery.description),
+                  
+                  const SizedBox(height: 8),
+                  _buildDetailRow(
+                    'Distance:',
+                    '${_calculateDistance(
+                      _courierLocation.latitude,
+                      _courierLocation.longitude,
+                      delivery.pickupLocation.latitude,
+                      delivery.pickupLocation.longitude,
+                    ).toStringAsFixed(2)} km from you',
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  _buildDetailRow(
+                    'Estimated earnings:',
+                    '\$${(15.0 + math.Random().nextDouble() * 10).toStringAsFixed(2)}',
+                    valueColor: Colors.green,
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Add any action buttons here if needed in the future
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            Text('Pickup: ${delivery.pickupAddress}'),
-            Text('Dropoff: ${delivery.dropoffAddress}'),
-            Text('Description: ${delivery.description}'),
-            const SizedBox(height: 8),
-            Text(
-              'Distance from you: ${_calculateDistance(
-                _courierLocation.latitude,
-                _courierLocation.longitude,
-                delivery.pickupLocation.latitude,
-                delivery.pickupLocation.longitude,
-              ).toStringAsFixed(2)} km',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Estimated earnings: \$${(15.0 + math.Random().nextDouble() * 10).toStringAsFixed(2)}',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // Expanded(
-                //   child: ElevatedButton(
-                //     onPressed: () {
-                //       // Implement accept delivery
-                //       setState(() {
-                //         _myDeliveries.add(delivery);
-                //         _availableDeliveries.remove(delivery);
-                //         if (_recommendedDelivery?.id == delivery.id) {
-                //           _findRecommendedDelivery();
-                //         }
-                //       });
-                //       Navigator.pop(context);
-                //       ScaffoldMessenger.of(context).showSnackBar(
-                //         SnackBar(
-                //           content: Text('Delivery #${delivery.id} accepted!'),
-                //           backgroundColor: Colors.green,
-                //         ),
-                //       );
-                //     },
-                //     style: isRecommended 
-                //       ? ElevatedButton.styleFrom(
-                //           backgroundColor: Colors.amber,
-                //         )
-                //       : ElevatedButton.styleFrom(
-                //           backgroundColor: Colors.green,
-                //         ),
-                //     child: Text(
-                //       isRecommended ? 'Accept Recommended' : 'Accept Delivery',
-                //       style: TextStyle(color: Colors.white),
-                //     ),
-                //   ),
-                // ),
-                // const SizedBox(width: 8),
-                // TextButton(
-                //   onPressed: () => Navigator.pop(context),
-                //   child: const Text('Close'),
-                // ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   void _onNavigationTap(int index) {
     setState(() {
@@ -428,77 +511,117 @@ class _CourierDashboardState extends State<CourierDashboard> {
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // FIX: Make radius info responsive
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 350) {
+                        // Stack vertically on narrow screens
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Operational Radius: ${_operationalRadius.toStringAsFixed(1)} km',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_availableDeliveries.length} deliveries in range',
+                              style: TextStyle(
+                                color: _availableDeliveries.isEmpty 
+                                    ? Colors.red 
+                                    : Colors.green,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        );
+                      } else {
+                        // Normal horizontal layout
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Operational Radius: ${_operationalRadius.toStringAsFixed(1)} km',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              '${_availableDeliveries.length} deliveries in range',
+                              style: TextStyle(
+                                color: _availableDeliveries.isEmpty 
+                                    ? Colors.red 
+                                    : Colors.green,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
+                  ),
+                  Slider(
+                    value: _operationalRadius,
+                    min: 1.0,
+                    max: 20.0,
+                    divisions: 19,
+                    label: _operationalRadius.toStringAsFixed(1),
+                    onChanged: (value) {
+                      setState(() {
+                        _operationalRadius = value;
+                        _updateOperationalAreaCircle();
+                        _filterDeliveriesByRadius();
+                        _findRecommendedDelivery();
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+            if (_recommendedDelivery != null)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8.0),
+                  border: Border.all(color: Colors.amber),
+                ),
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Operational Radius: ${_operationalRadius.toStringAsFixed(1)} km',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          '${_availableDeliveries.length} deliveries in range',
-                          style: TextStyle(
-                            color: _availableDeliveries.isEmpty 
-                                ? Colors.red 
-                                : Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                    const Icon(Icons.stars, color: Colors.amber),
+                    const SizedBox(width: 8),
+                    // FIX: Use Expanded to prevent text overflow
+                    Expanded(
+                      child: Text(
+                        'Recommended: Delivery #${_recommendedDelivery!.id} - ${_calculateDistance(
+                          _courierLocation.latitude,
+                          _courierLocation.longitude,
+                          _recommendedDelivery!.pickupLocation.latitude,
+                          _recommendedDelivery!.pickupLocation.longitude,
+                        ).toStringAsFixed(2)} km away',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis, // Add ellipsis for long text
+                        maxLines: 2, // Allow up to 2 lines for wrapping
+                      ),
                     ),
-                    Slider(
-                      value: _operationalRadius,
-                      min: 1.0,
-                      max: 20.0,
-                      divisions: 19,
-                      label: _operationalRadius.toStringAsFixed(1),
-                      onChanged: (value) {
-                        setState(() {
-                          _operationalRadius = value;
-                          _updateOperationalAreaCircle();
-                          _filterDeliveriesByRadius();
-                          _findRecommendedDelivery();
-                        });
-                      },
+                    // FIX: Use Flexible for the button to prevent overflow
+                    Flexible(
+                      child: TextButton(
+                        onPressed: () => _showDeliveryDetails(_recommendedDelivery!),
+                        child: const Text('Details'),
+                      ),
                     ),
                   ],
                 ),
               ),
-              if (_recommendedDelivery != null)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
-                  padding: const EdgeInsets.all(8.0),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8.0),
-                    border: Border.all(color: Colors.amber),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.stars, color: Colors.amber),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Recommended: Delivery #${_recommendedDelivery!.id} - ${_calculateDistance(
-                            _courierLocation.latitude,
-                            _courierLocation.longitude,
-                            _recommendedDelivery!.pickupLocation.latitude,
-                            _recommendedDelivery!.pickupLocation.longitude,
-                          ).toStringAsFixed(2)} km away',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => _showDeliveryDetails(_recommendedDelivery!),
-                        child: const Text('Details'),
-                      ),
-                    ],
-                  ),
-                ),
             ],
           ),
         ),
@@ -534,37 +657,42 @@ class _CourierDashboardState extends State<CourierDashboard> {
                 )
               : _showMapView
                   ? GoogleMap(
-                      initialCameraPosition: CameraPosition(
-                        target: _courierLocation,
-                        zoom: 12,
+                    initialCameraPosition: CameraPosition(
+                      target: _courierLocation,
+                      zoom: 12,
+                    ),
+                    circles: _circles,
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId('courier'),
+                        position: _courierLocation,
+                        infoWindow: const InfoWindow(title: 'Your Location'),
+                        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
                       ),
-                      circles: _circles,
-                      markers: {
-                        Marker(
-                          markerId: const MarkerId('courier'),
-                          position: _courierLocation,
-                          infoWindow: const InfoWindow(title: 'Your Location'),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-                        ),
-                        ..._availableDeliveries.map(
-                          (delivery) => Marker(
-                            markerId: MarkerId(delivery.id),
-                            position: delivery.pickupLocation,
-                            infoWindow: InfoWindow(
-                              title: 'Pickup: ${delivery.pickupAddress}',
-                              snippet: 'Tap for details',
-                            ),
-                            icon: _recommendedDelivery?.id == delivery.id
-                                ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow)
-                                : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-                            onTap: () => _showDeliveryDetails(delivery),
+                      ..._availableDeliveries.map(
+                        (delivery) => Marker(
+                          markerId: MarkerId(delivery.id),
+                          position: delivery.pickupLocation,
+                          // FIX: Truncate long delivery IDs in info windows
+                          infoWindow: InfoWindow(
+                            title: delivery.id.length > 10 
+                                ? 'Delivery #${delivery.id.substring(0, 10)}...'
+                                : 'Delivery #${delivery.id}',
+                            snippet: delivery.pickupAddress.length > 30
+                                ? '${delivery.pickupAddress.substring(0, 30)}...'
+                                : delivery.pickupAddress,
                           ),
+                          icon: _recommendedDelivery?.id == delivery.id
+                              ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow)
+                              : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                          onTap: () => _showDeliveryDetails(delivery),
                         ),
-                      },
-                      onMapCreated: (GoogleMapController controller) {
-                        _mapController = controller;
-                      },
-                    )
+                      ),
+                    },
+                    onMapCreated: (GoogleMapController controller) {
+                      _mapController = controller;
+                    },
+                  )
                   : _availableDeliveries.isEmpty
                       ? Center(
                           child: Column(
@@ -616,9 +744,20 @@ class _CourierDashboardState extends State<CourierDashboard> {
                                     )
                                   : null,
                               child: ListTile(
+                                // FIX: Wrap title in Row with proper constraints
                                 title: Row(
                                   children: [
-                                    Text('Delivery #${delivery.id}'),
+                                    // FIX: Use Expanded to prevent delivery ID overflow
+                                    Expanded(
+                                      child: Text(
+                                        'Delivery #${delivery.id}',
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
                                     if (isRecommended) const SizedBox(width: 8),
                                     if (isRecommended)
                                       const Icon(Icons.stars, color: Colors.amber, size: 20),
@@ -627,40 +766,83 @@ class _CourierDashboardState extends State<CourierDashboard> {
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('From: ${delivery.pickupAddress}'),
-                                    Text('To: ${delivery.dropoffAddress}'),
+                                    // FIX: Use Expanded or constrained width for addresses
+                                    Text(
+                                      'From: ${delivery.pickupAddress}',
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      style: TextStyle(fontSize: 13),
+                                    ),
+                                    Text(
+                                      'To: ${delivery.dropoffAddress}',
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      style: TextStyle(fontSize: 13),
+                                    ),
                                     const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${distance.toStringAsFixed(2)} km',
-                                          style: TextStyle(fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(width: 16),
-                                        Icon(Icons.monetization_on, size: 14, color: Colors.green),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '\$${estimatedEarnings.toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green,
-                                          ),
-                                        ),
-                                      ],
+                                    // FIX: Make stats row responsive
+                                    LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        if (constraints.maxWidth < 200) {
+                                          // Stack vertically on very narrow cards
+                                          return Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '${distance.toStringAsFixed(2)} km',
+                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.monetization_on, size: 14, color: Colors.green),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '\$${estimatedEarnings.toStringAsFixed(2)}',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.green,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          );
+                                        } else {
+                                          // Normal horizontal layout
+                                          return Row(
+                                            children: [
+                                              Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '${distance.toStringAsFixed(2)} km',
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Icon(Icons.monetization_on, size: 14, color: Colors.green),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '\$${estimatedEarnings.toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.green,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        }
+                                      },
                                     ),
                                   ],
                                 ),
-                                // trailing: ElevatedButton(
-                                //   onPressed: () => _showDeliveryDetails(delivery),
-                                //   style: ElevatedButton.styleFrom(
-                                //     backgroundColor: isRecommended ? Colors.amber : Colors.green,
-                                //     foregroundColor: Colors.white,
-                                //     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                //   ),
-                                //   child: Text(isRecommended ? 'Recommended' : 'View'),
-                                // ),
                                 isThreeLine: true,
                                 onTap: () => _showDeliveryDetails(delivery),
                               ),
