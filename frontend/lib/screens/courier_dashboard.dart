@@ -365,7 +365,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
     });
   }
 void _navigateToLocation(LatLng location, String type) async {
-  final url = 'https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}&travelmode=driving';
+  final url = 'https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}&travelmode=driving&dir_action=navigate';
   
   try {
     if (await canLaunch(url)) {
