@@ -721,184 +721,322 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
       curve: Curves.easeInOut,
     );
   }
-
-  void _showDeliveryDetails(Delivery delivery) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => Container(
-            padding: const EdgeInsets.all(16),
-            height: MediaQuery.of(context).size.height * 0.8,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Delivery #${delivery.id}',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    Chip(
-                      label: Text(delivery.status),
-                      backgroundColor: _getStatusColor(delivery.status),
-                      labelStyle: const TextStyle(color: Colors.white),
-                    ),
-                  ],
+void _showDeliveryDetails(Delivery delivery) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => Container(
+      padding: const EdgeInsets.all(16),
+      height: MediaQuery.of(context).size.height * 0.8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // FIXED: Prevent overflow in the header row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Use Expanded to prevent text overflow
+              Expanded(
+                flex: 3, // Give more space to the title
+                child: Text(
+                  'Delivery #${delivery.id}',
+                  style: Theme.of(context).textTheme.titleLarge,
+                  overflow: TextOverflow.ellipsis, // Add ellipsis for long IDs
+                  maxLines: 1, // Ensure it stays on one line
                 ),
-                const Divider(),
-                const SizedBox(height: 8),
-                _buildInfoSection('Delivery Details'),
-                _buildInfoRow('Pickup:', delivery.pickupAddress),
-                _buildInfoRow('Dropoff:', delivery.dropoffAddress),
-                _buildInfoRow('Description:', delivery.description),
-                _buildInfoRow('Created:', '2 hours ago'),
-                const SizedBox(height: 16),
-
-                if (delivery.status == 'in_progress' ||
-                    delivery.status == 'accepted')
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildInfoSection('Courier Information'),
-                      _buildInfoRow('Name:', 'John Doe'),
-                      _buildInfoRow('Rating:', '4.8 ★'),
-                      _buildInfoRow('Expected delivery:', '15:30'),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                _showContactCourierDialog(context, delivery);
-                              },
-                              icon: const Icon(Icons.message),
-                              label: const Text('Message Courier'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => DeliveryTrackingPage(
-                                          delivery: delivery,
-                                        ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.location_on),
-                              label: const Text('Track Live'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+              ),
+              const SizedBox(width: 8), // Add some spacing
+              // Use Flexible for the chip to wrap if needed
+              Flexible(
+                flex: 2, // Give less space to the chip
+                child: Chip(
+                  label: Text(
+                    delivery.status,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12, // Slightly smaller font to ensure it fits
+                    ),
+                    overflow: TextOverflow.ellipsis, // Prevent chip text overflow
                   ),
+                  backgroundColor: _getStatusColor(delivery.status),
+                ),
+              ),
+            ],
+          ),
+          
 
-                if (delivery.status == 'completed')
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildInfoSection('Delivery Summary'),
-                      _buildInfoRow('Delivered at:', '15:32, May 20, 2025'),
-                      _buildInfoRow('Courier:', 'John Doe'),
-                      _buildInfoRow('Signature:', 'Available'),
-                      _buildInfoRow('Rating:', 'Not rated yet'),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _showRatingDialog(delivery),
-                          icon: const Icon(Icons.star),
-                          label: const Text('Rate this Delivery'),
-                        ),
-                      ),
-                    ],
-                  ),
+          const Divider(),
+          const SizedBox(height: 8),
+          
+          // Make the rest of the content scrollable to prevent bottom overflow
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoSection('Delivery Details'),
+                  _buildInfoRow('Pickup:', delivery.pickupAddress),
+                  _buildInfoRow('Dropoff:', delivery.dropoffAddress),
+                  _buildInfoRow('Description:', delivery.description),
+                  _buildInfoRow('Created:', '2 hours ago'),
+                  const SizedBox(height: 16),
 
-                if (delivery.status == 'pending')
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildInfoSection('Pending Delivery'),
-                      _buildInfoRow('Created at:', '13:15, May 21, 2025'),
-                      _buildInfoRow(
-                        'Status:',
-                        'Waiting for courier assignment',
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                // TODO: Implement edit
-                              },
-                              icon: const Icon(Icons.edit),
-                              label: const Text('Edit Details'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                print(
-                                  '[BusinessCancel] pressed for ${delivery.id}',
-                                );
-                                final token = await AuthService.getToken();
-                                if (token == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Login required')),
-                                  );
-                                  return;
-                                }
-                                try {
-                                  await DeliveryService.cancelDelivery(
-                                    delivery.id,
-                                    token,
-                                  );
-                                  await _loadDeliveries();
-                                  Navigator.of(context).pop();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Order cancelled')),
-                                  );
-                                } catch (e) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Cancel failed: $e'),
+                  if (delivery.status == 'in_progress' ||
+                      delivery.status == 'accepted')
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInfoSection('Courier Information'),
+                        _buildInfoRow('Name:', 'John Doe'),
+                        _buildInfoRow('Rating:', '4.8 ★'),
+                        _buildInfoRow('Expected delivery:', '15:30'),
+                        
+                        // FIXED: Make buttons responsive to prevent overflow
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            // If screen is narrow, stack buttons vertically
+                            if (constraints.maxWidth < 350) {
+                              return Column(
+                                children: [
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        _showContactCourierDialog(context, delivery);
+                                      },
+                                      icon: const Icon(Icons.message),
+                                      label: const Text('Message Courier'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue,
+                                      ),
                                     ),
-                                  );
-                                }
-                              },
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => DeliveryTrackingPage(
+                                              delivery: delivery,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.location_on),
+                                      label: const Text('Track Live'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            } else {
+                              // Normal horizontal layout for wider screens
+                              return Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        _showContactCourierDialog(context, delivery);
+                                      },
+                                      icon: const Icon(Icons.message),
+                                      label: const Text('Message Courier'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => DeliveryTrackingPage(
+                                              delivery: delivery,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.location_on),
+                                      label: const Text('Track Live'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
 
-                              icon: const Icon(Icons.cancel),
-                              label: const Text('Cancel'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                              ),
-                            ),
+                  if (delivery.status == 'completed')
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInfoSection('Delivery Summary'),
+                        _buildInfoRow('Delivered at:', '15:32, May 20, 2025'),
+                        _buildInfoRow('Courier:', 'John Doe'),
+                        _buildInfoRow('Signature:', 'Available'),
+                        _buildInfoRow('Rating:', 'Not rated yet'),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _showRatingDialog(delivery),
+                            icon: const Icon(Icons.star),
+                            label: const Text('Rate this Delivery'),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-              ],
+                        ),
+                      ],
+                    ),
+
+                  if (delivery.status == 'pending')
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInfoSection('Pending Delivery'),
+                        _buildInfoRow('Created at:', '13:15, May 21, 2025'),
+                        _buildInfoRow(
+                          'Status:',
+                          'Waiting for courier assignment',
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // FIXED: Make cancel/edit buttons responsive
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            if (constraints.maxWidth < 350) {
+                              return Column(
+                                children: [
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        // TODO: Implement edit
+                                      },
+                                      icon: const Icon(Icons.edit),
+                                      label: const Text('Edit Details'),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        print('[BusinessCancel] pressed for ${delivery.id}');
+                                        final token = await AuthService.getToken();
+                                        if (token == null) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Login required')),
+                                          );
+                                          return;
+                                        }
+                                        try {
+                                          await DeliveryService.cancelDelivery(
+                                            delivery.id,
+                                            token,
+                                          );
+                                          await _loadDeliveries();
+                                          Navigator.of(context).pop();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Order cancelled')),
+                                          );
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Cancel failed: $e'),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      icon: const Icon(Icons.cancel),
+                                      label: const Text('Cancel'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            } else {
+                              return Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        // TODO: Implement edit
+                                      },
+                                      icon: const Icon(Icons.edit),
+                                      label: const Text('Edit Details'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        print('[BusinessCancel] pressed for ${delivery.id}');
+                                        final token = await AuthService.getToken();
+                                        if (token == null) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Login required')),
+                                          );
+                                          return;
+                                        }
+                                        try {
+                                          await DeliveryService.cancelDelivery(
+                                            delivery.id,
+                                            token,
+                                          );
+                                          await _loadDeliveries();
+                                          Navigator.of(context).pop();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Order cancelled')),
+                                          );
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Cancel failed: $e'),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      icon: const Icon(Icons.cancel),
+                                      label: const Text('Cancel'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  
+                  // Add bottom padding to prevent content from being cut off
+                  const SizedBox(height: 32),
+                ],
+              ),
             ),
           ),
-    );
-  }
-
+        ],
+      ),
+    ),
+  );
+}
   Widget _buildInfoSection(String title) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
