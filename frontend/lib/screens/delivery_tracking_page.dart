@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../models/delivery.dart';
-import '../services/delivery_service.dart';
-import '../services/auth_service.dart';
 import '../services/delivery_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -136,69 +133,85 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
       print('Error loading courier info: $e');
     }
   }
-
-  Future<void> _loadCourierLocation() async {
-    if (_currentDelivery.assignedCourier == null) return;
-    
-    try {
-      // TODO: Implement proper courier location fetching when backend endpoint exists
-      // For now, simulate location based on delivery status
-      // In production, you'd call something like:
-      // final locationResponse = await CourierService.getCourierLocation(_currentDelivery.assignedCourier!);
-      
-      LatLng baseLocation;
-      double randomOffset = 0.001;
-      
-      switch (_currentDelivery.status) {
-        case 'accepted':
-        case 'heading_to_pickup':
-          baseLocation = LatLng(
-            _currentDelivery.pickupLocation.latitude - 0.005 + (math.Random().nextDouble() * 0.01),
-            _currentDelivery.pickupLocation.longitude - 0.005 + (math.Random().nextDouble() * 0.01),
-          );
-          break;
-        case 'arrived_at_pickup':
-        case 'picked_up':
-          baseLocation = LatLng(
-            _currentDelivery.pickupLocation.latitude + (math.Random().nextDouble() * randomOffset - randomOffset/2),
-            _currentDelivery.pickupLocation.longitude + (math.Random().nextDouble() * randomOffset - randomOffset/2),
-          );
-          break;
-        case 'in_progress':
-        case 'in_transit':
-          double progress = 0.3 + (math.Random().nextDouble() * 0.4);
-          baseLocation = LatLng(
-            _currentDelivery.pickupLocation.latitude + 
-              ((_currentDelivery.dropoffLocation.latitude - _currentDelivery.pickupLocation.latitude) * progress),
-            _currentDelivery.pickupLocation.longitude + 
-              ((_currentDelivery.dropoffLocation.longitude - _currentDelivery.pickupLocation.longitude) * progress),
-          );
-          break;
-        case 'arrived_at_dropoff':
-        case 'delivered':
-          baseLocation = LatLng(
-            _currentDelivery.dropoffLocation.latitude + (math.Random().nextDouble() * randomOffset - randomOffset/2),
-            _currentDelivery.dropoffLocation.longitude + (math.Random().nextDouble() * randomOffset - randomOffset/2),
-          );
-          break;
-        default:
-          baseLocation = _currentDelivery.pickupLocation;
-      }
-      
+//////// mayar u r here 
+Future<void> _loadCourierLocation() async {
+  final courierId = _currentDelivery.assignedCourier;
+  if (courierId == null) return;
+  try {
+    final resp = await DeliveryService.getCourierLocation(courierId);
+    if (resp.success && resp.data != null) {
       setState(() {
-        _courierLocation = baseLocation;
+        _courierLocation = LatLng(resp.data!['lat']!, resp.data!['lng']!);
       });
-      
-    } catch (e) {
-      print('Error loading courier location: $e');
     }
+  } catch (e) {
+    debugPrint('Error loading courier location: $e');
   }
+}
+
+  // Future<void> _loadCourierLocation() async {
+  //   if (_currentDelivery.assignedCourier == null) return;
+    
+  //   try {
+  //     // TODO: Implement proper courier location fetching when backend endpoint exists
+  //     // For now, simulate location based on delivery status
+  //     // In production, you'd call something like:
+  //     // final locationResponse = await CourierService.getCourierLocation(_currentDelivery.assignedCourier!);
+      
+  //     LatLng baseLocation;
+  //     double randomOffset = 0.001;
+      
+  //     switch (_currentDelivery.status) {
+  //       case 'accepted':
+  //       case 'heading_to_pickup':
+  //         baseLocation = LatLng(
+  //           _currentDelivery.pickupLocation.latitude - 0.005 + (math.Random().nextDouble() * 0.01),
+  //           _currentDelivery.pickupLocation.longitude - 0.005 + (math.Random().nextDouble() * 0.01),
+  //         );
+  //         break;
+  //       case 'arrived_at_pickup':
+  //       case 'picked_up':
+  //         baseLocation = LatLng(
+  //           _currentDelivery.pickupLocation.latitude + (math.Random().nextDouble() * randomOffset - randomOffset/2),
+  //           _currentDelivery.pickupLocation.longitude + (math.Random().nextDouble() * randomOffset - randomOffset/2),
+  //         );
+  //         break;
+  //       case 'in_progress':
+  //       case 'in_transit':
+  //         double progress = 0.3 + (math.Random().nextDouble() * 0.4);
+  //         baseLocation = LatLng(
+  //           _currentDelivery.pickupLocation.latitude + 
+  //             ((_currentDelivery.dropoffLocation.latitude - _currentDelivery.pickupLocation.latitude) * progress),
+  //           _currentDelivery.pickupLocation.longitude + 
+  //             ((_currentDelivery.dropoffLocation.longitude - _currentDelivery.pickupLocation.longitude) * progress),
+  //         );
+  //         break;
+  //       case 'arrived_at_dropoff':
+  //       case 'delivered':
+  //         baseLocation = LatLng(
+  //           _currentDelivery.dropoffLocation.latitude + (math.Random().nextDouble() * randomOffset - randomOffset/2),
+  //           _currentDelivery.dropoffLocation.longitude + (math.Random().nextDouble() * randomOffset - randomOffset/2),
+  //         );
+  //         break;
+  //       default:
+  //         baseLocation = _currentDelivery.pickupLocation;
+  //     }
+      
+  //     setState(() {
+  //       _courierLocation = baseLocation;
+  //     });
+      
+  //   } catch (e) {
+  //     print('Error loading courier location: $e');
+  //   }
+  // }
 
   void _startPeriodicUpdates() {
     // Poll for updates every 10 seconds
     _statusUpdateTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (mounted && _currentDelivery.status != 'completed' && _currentDelivery.status != 'cancelled') {
         _loadDeliveryDetails();
+        _loadCourierLocation();
       }
     });
   }

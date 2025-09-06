@@ -43,19 +43,19 @@ def create_user_profile():
 
         user_doc_ref = db.collection('users').document(uid)
 
-        # Build the profile dict
+        
         profile = {
             'role': role,
             'displayName': display_name,
             'email': email,
             'phone': phone,
         }
-        # Merge in all extra fields from Flutter, unless already set above
+        
         for key, value in data.items():
             if key not in profile or not profile[key]:
                 profile[key] = value
 
-        # Save to Firestore (merges if doc exists, creates if not)
+        # Save to Firestore 
         user_doc_ref.set(profile, merge=True)
 
         return jsonify({'success': True}), 201
@@ -72,14 +72,14 @@ def create_user_profile():
 def get_user_profile():
     try:
         uid = request.uid
-        #uid = 'TEST_UID'   # same dummy ID
+        #uid = 'TEST_UID'  
 
         user_doc = db.collection('users').document(uid).get()
         if not user_doc.exists:
             return jsonify({'success': False, 'error': 'Profile not found'}), 404
 
         data = user_doc.to_dict()
-        # Always include the uid so client knows who it is
+        
         data['uid'] = uid
 
         return jsonify({'success': True, 'profile': data}), 200
@@ -96,7 +96,7 @@ def update_user_profile():
             return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
 
         uid = request.uid
-       # uid = 'TEST_UID'   # same dummy ID
+       # uid = 'TEST_UID'  
         user_doc_ref = db.collection('users').document(uid)
         if not user_doc_ref.get().exists:
             return jsonify({'success': False, 'error': 'Profile not found'}), 404
@@ -111,7 +111,7 @@ def update_user_profile():
             if data['role'] not in ('business', 'courier'):
                 return jsonify({'success': False, 'error': 'Invalid role'}), 400
             updates['role'] = data['role']
-        # You can also allow updating email if you like:
+       
         if 'email' in data:
             updates['email'] = data['email']
 
@@ -444,7 +444,6 @@ def delete_business(business_id):
 
 # === DELIVERY ROUTES START HERE ===
 
-# NEW: GET endpoint for dashboard to fetch all courier locations
 @app.route('/getCourierLocations', methods=['GET'])
 @require_token
 def get_courier_locations():
@@ -548,7 +547,7 @@ def get_deliveries():
     """
     try:
         uid = request.uid
-        # 1) Fetch this user’s profile to know their role
+        
         user_doc = db.collection('users').document(uid).get()
         if not user_doc.exists:
             return jsonify({'success': False, 'error': 'Profile not found'}), 404
@@ -557,10 +556,10 @@ def get_deliveries():
         role = profile.get('role')
 
         if role == 'business':
-            # Query deliveries created by this business
+            
             query = db.collection('deliveries').where('createdBy', '==', uid)
         elif role == 'courier':
-            # Query deliveries assigned to this courier
+           
             query = db.collection('deliveries').where('assignedCourier', '==', uid)
         else:
             return jsonify({'success': False, 'error': 'Invalid role'}), 400
@@ -570,7 +569,7 @@ def get_deliveries():
         deliveries = []
         for doc in docs:
             data = doc.to_dict()
-            # Include the doc ID on each record
+            
             deliveries.append({'id': doc.id, **data})
 
         return jsonify({'success': True, 'deliveries': deliveries}), 200
@@ -610,7 +609,7 @@ def update_delivery_status(delivery_id):
             return jsonify({'success': False, 'error': 'Missing status field'}), 400
 
         uid = request.uid
-        # 1) Verify the delivery exists and that this user is actually the assigned courier
+        #  Verify the delivery exists and that this user is actually the assigned courier
         doc_ref = db.collection('deliveries').document(delivery_id)
         doc = doc_ref.get()
         if not doc.exists:
@@ -621,7 +620,7 @@ def update_delivery_status(delivery_id):
         if assigned != uid:
             return jsonify({'success': False, 'error': 'Forbidden—You are not assigned to this delivery'}), 403
 
-        # 2) Update the status field and timestampUpdated
+        
         doc_ref.update({
             'status': new_status,
             'timestampUpdated': firestore.SERVER_TIMESTAMP
@@ -677,11 +676,11 @@ def auth_google():
         return jsonify({'success': False, 'error': 'Missing id_token'}), 400
 
     try:
-        # Verify the Firebase ID token
+        
         decoded = firebase_auth.verify_id_token(id_token)
         uid = decoded['uid']
 
-        # (Optional) Create or update a Firestore profile document
+        
         user_ref = db.collection('users').document(uid)
         update_data = {}
         if decoded.get('email'):
@@ -689,10 +688,10 @@ def auth_google():
         pic = decoded.get('picture')
         if pic:
             update_data['photoURL'] = pic
-        # note: we skip 'name' entirely to preserve your chosen displayName
+       
 
         if update_data:
-            # use update() so we don’t wipe out fields not in update_data
+           
             user_ref.set(update_data,merge=True)
 
 
