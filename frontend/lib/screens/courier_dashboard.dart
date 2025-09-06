@@ -413,159 +413,211 @@ void _navigateToLocation(LatLng location, String type) async {
 void _showDeliveryDetails(Delivery delivery) {
   bool isRecommended = _recommendedDelivery?.id == delivery.id;
   
+  // Compute mid-point & markers for map
+  LatLng pickup = delivery.pickupLocation;
+  LatLng dropoff = delivery.dropoffLocation;
+  LatLng center = LatLng(
+    (pickup.latitude + dropoff.latitude) / 2,
+    (pickup.longitude + dropoff.longitude) / 2,
+  );
+
+  Set<Marker> markers = {
+    Marker(
+      markerId: const MarkerId('pickup'),
+      position: pickup,
+      infoWindow: const InfoWindow(title: 'Pickup'),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    ),
+    Marker(
+      markerId: const MarkerId('dropoff'),
+      position: dropoff,
+      infoWindow: const InfoWindow(title: 'Drop-off'),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+    ),
+  };
+
+  List<LatLng> route = [pickup, dropoff];
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) => Container(
-      padding: const EdgeInsets.all(16),
-      height: MediaQuery.of(context).size.height * 0.7,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // FIX: Prevent header overflow
-          Row(
-            children: [
-              // FIX: Use Expanded to prevent text overflow
-              Expanded(
-                flex: 3,
-                child: Text(
-                  'Delivery Details',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-              if (isRecommended) const SizedBox(width: 8),
-              if (isRecommended)
-                Flexible(
-                  child: Tooltip(
-                    message: 'Recommended delivery based on your location',
-                    child: Icon(Icons.stars, color: Colors.amber),
-                  ),
-                ),
-            ],
+    backgroundColor: Colors.transparent,
+    enableDrag: false, // Prevent accidental dismissal
+    builder: (BuildContext ctx) {
+      return FractionallySizedBox(
+        heightFactor: 0.75, // Fixed at 75% height
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
-          
-          const SizedBox(height: 8),
-          
-          // FIX: Add delivery ID with proper overflow handling
-          Row(
-            children: [
-              Text(
-                'ID: ',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]),
-              ),
-              Expanded(
-                child: Text(
-                  '#${delivery.id}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[700],
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Make the content scrollable to prevent bottom overflow
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // FIX: Use helper method for consistent formatting
-                  _buildDetailRow('Pickup:', delivery.pickupAddress),
-                  _buildDetailRow('Dropoff:', delivery.dropoffAddress),
-                  _buildDetailRow('Description:', delivery.description),
-                  
-                  const SizedBox(height: 8),
-                  _buildDetailRow(
-                    'Distance:',
-                    '${_calculateDistance(
-                      _courierLocation.latitude,
-                      _courierLocation.longitude,
-                      delivery.pickupLocation.latitude,
-                      delivery.pickupLocation.longitude,
-                    ).toStringAsFixed(2)} km from you',
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  _buildDetailRow(
-                    'Estimated earnings:',
-                    '\$${(15.0 + math.Random().nextDouble() * 10).toStringAsFixed(2)}',
-                    valueColor: Colors.green,
-                  ),
-                  
-                  const SizedBox(height: 24),
-
-                  //navigation button
-                  if (delivery.status == 'pending' || delivery.status == 'accepted')
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _navigateToLocation(
-                          delivery.status == 'pending' || delivery.status == 'accepted' 
-                              ? delivery.pickupLocation  // Navigate to pickup if not picked up yet
-                              : delivery.dropoffLocation, // Navigate to dropoff if already picked up
-                          delivery.status == 'pending' || delivery.status == 'accepted'
-                              ? 'pickup'
-                              : 'dropoff',
-                        ),
-                        icon: const Icon(Icons.navigation),
-                        label: Text(
-                          delivery.status == 'pending' || delivery.status == 'accepted'
-                              ? 'Navigate to Pickup'
-                              : 'Navigate to Dropoff',
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
+          child: Column(
+            children: <Widget>[
+              // Handle + close button
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
                     ),
-                  
-                  // If delivery is in progress, show navigate to dropoff button
-                  if (delivery.status == 'in_progress')
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _navigateToLocation(
-                          delivery.dropoffLocation,
-                          'dropoff',
-                        ),
-                        icon: const Icon(Icons.navigation),
-                        label: const Text('Navigate to Dropoff'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                        ),
+                    IconButton(
+                      icon: Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Header with ID and status
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        'Delivery #${delivery.id}',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
-                  
-                  const SizedBox(height: 16),
-
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ),
-                ],
+                    if (isRecommended) const SizedBox(width: 8),
+                    if (isRecommended)
+                      Tooltip(
+                        message: 'Recommended delivery based on your location',
+                        child: Icon(Icons.stars, color: Colors.amber),
+                      ),
+                  ],
+                ),
               ),
-            ),
+
+              // The map
+              Expanded(
+                flex: 2,
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(target: center, zoom: 13),
+                  markers: markers,
+                  polylines: {
+                    Polyline(
+                      polylineId: const PolylineId('route'),
+                      points: route,
+                      color: Colors.blue,
+                      width: 4,
+                    ),
+                  },
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: true,
+                  mapToolbarEnabled: false,
+                ),
+              ),
+
+              // The textual details
+              Expanded(
+                flex: 1,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      _buildDetailRow('Pickup:', delivery.pickupAddress),
+                      _buildDetailRow('Dropoff:', delivery.dropoffAddress),
+                      _buildDetailRow('Description:', delivery.description),
+                      
+                      const SizedBox(height: 8),
+                      _buildDetailRow(
+                        'Distance:',
+                        '${_calculateDistance(
+                          _courierLocation.latitude,
+                          _courierLocation.longitude,
+                          delivery.pickupLocation.latitude,
+                          delivery.pickupLocation.longitude,
+                        ).toStringAsFixed(2)} km from you',
+                      ),
+                      
+                      const SizedBox(height: 8),
+                      _buildDetailRow(
+                        'Estimated earnings:',
+                        '\$${delivery.fee?.toStringAsFixed(2) ?? (15.0 + math.Random().nextDouble() * 10).toStringAsFixed(2)}',
+                        valueColor: Colors.green,
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Navigation buttons based on status
+                      if (delivery.status == 'pending' || delivery.status == 'accepted')
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _navigateToLocation(
+                              delivery.status == 'pending' || delivery.status == 'accepted' 
+                                  ? delivery.pickupLocation
+                                  : delivery.dropoffLocation,
+                              delivery.status == 'pending' || delivery.status == 'accepted'
+                                  ? 'pickup'
+                                  : 'dropoff',
+                            ),
+                            icon: const Icon(Icons.navigation),
+                            label: Text(
+                              delivery.status == 'pending' || delivery.status == 'accepted'
+                                  ? 'Navigate to Pickup'
+                                  : 'Navigate to Dropoff',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      
+                      if (delivery.status == 'in_progress')
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _navigateToLocation(
+                              delivery.dropoffLocation,
+                              'dropoff',
+                            ),
+                            icon: const Icon(Icons.navigation),
+                            label: const Text('Navigate to Dropoff'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Close'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    ),
+        ),
+      );
+    },
   );
 }
-
 
   void _onNavigationTap(int index) {
     setState(() {
