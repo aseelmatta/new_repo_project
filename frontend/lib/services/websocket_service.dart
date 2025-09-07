@@ -30,6 +30,19 @@ class WebSocketService {
     _channel = WebSocketChannel.connect(Uri.parse(url));
   }
 
+  /// Register this client with the server by sending a JSON message
+  /// containing the currently authenticated user's UID.  The backend
+  /// uses the "register" message to map WebSocket connections to
+  /// users so that it can deliver targeted events (for example when a
+  /// delivery is assigned to a specific courier).  You should call
+  /// this method immediately after connecting and obtaining the
+  /// current user's UID via AuthService.getUid().
+  void registerUser(String uid) {
+    if (uid.isNotEmpty) {
+      send({'type': 'register', 'uid': uid});
+    }
+  }
+
   /// A stream of decoded JSON messages from the server.  Each event
   /// emitted by the underlying `WebSocketChannel` is parsed as JSON
   /// into a `Map<String, dynamic>`.  Messages that cannot be parsed

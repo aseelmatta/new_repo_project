@@ -59,6 +59,12 @@ class WebSocketManager:
         self.loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
         # Keep track of connected WebSocket clients
         self.connected_clients: Set[websockets.WebSocketServerProtocol] = set()
+        # Map of user ids to the set of WebSocket connections registered for that user
+        # When a client connects they should send a JSON message like
+        # {"type": "register", "uid": "someUserId"}.  The handler will
+        # add the WebSocket to this mapping so targeted messages can be
+        # delivered to a specific courier without broadcasting to everyone.
+        self.clients_by_user: dict[str, set[websockets.WebSocketServerProtocol]] = {}
 
     async def handler(self, websocket: websockets.WebSocketServerProtocol, path: str) -> None:
         """Handle an individual WebSocket connection.
@@ -72,17 +78,54 @@ class WebSocketManager:
         # Register client
         self.connected_clients.add(websocket)
         try:
-            async for _message in websocket:
-                # Currently ignore messages from clients.  In a more
-                # sophisticated implementation you might parse JSON
-                # messages and use them to manage subscriptions.
-                pass
+            async for raw_message in websocket:
+                """
+                Listen for incoming messages from the client.  We expect
+                clients to send an initial JSON payload of the form
+                {"type": "register", "uid": "<userId>"} so that we can
+                associate this WebSocket connection with a specific
+                authenticated user.  Additional message types can be
+                handled here in the future (e.g. unsubscribe, ping/pong).
+                Any malformed JSON messages are ignored.
+                """
+                try:
+                    data = json.loads(raw_message)
+                except Exception:
+                    # Skip non‑JSON messages
+                    continue
+                if isinstance(data, dict):
+                    msg_type = data.get("type")
+                    # Handle registration from clients.  The client
+                    # should send {"type": "register", "uid": "<uid>"}
+                    # immediately after connecting.  We store the
+                    # mapping from uid -> WebSocket so that we can
+                    # broadcast targeted events later (for example, when a
+                    # delivery is assigned to a specific courier).
+                    if msg_type == "register":
+                        uid = data.get("uid")
+                        if isinstance(uid, str) and uid:
+                            # Add this websocket to the set for the uid
+                            self.clients_by_user.setdefault(uid, set()).add(websocket)
+                        continue
+                    # Additional message types could be handled here if
+                    # necessary (e.g. unsubscribe).
+                # If the message is not recognised we ignore it.
+                continue
         except websockets.ConnectionClosed:
             # Client disconnected
             pass
         finally:
             # Remove the client from the active set
             self.connected_clients.discard(websocket)
+            # Remove the websocket from any user mapping
+            # We iterate over a copy of the items because we may mutate
+            # the dict during iteration.
+            for uid, ws_set in list(self.clients_by_user.items()):
+                if websocket in ws_set:
+                    ws_set.discard(websocket)
+                    if not ws_set:
+                        # Remove the key entirely if no more connections
+                        del self.clients_by_user[uid]
 
     async def _run_server(self) -> None:
         """Coroutine that runs the WebSocket server forever."""
@@ -113,23 +156,47 @@ class WebSocketManager:
             payload = json.dumps(payload)
         await websocket.send(payload)
     def broadcast(self, message: dict) -> None:
-        """Broadcast a JSON message to all connected clients.
+        """
+        Broadcast a JSON message to all connected clients.
 
-        :param message: A JSON‑serializable dictionary to send to each
-            connected WebSocket client.  The message will be encoded
-            using :func:`json.dumps`.
+        This method serializes the given dictionary to a JSON string
+        once and sends it to every WebSocket in ``self.connected_clients``.
+        If a send fails because the socket is closed, the exception is
+        swallowed; the socket will be cleaned up on the next read or
+        when it disconnects.
         """
         if not self.connected_clients:
             return
-        # Serialize the message once to avoid repeated work
         data = json.dumps(message)
         for ws in list(self.connected_clients):
-            # Schedule the send coroutine on the server's event loop
             try:
                 asyncio.run_coroutine_threadsafe(ws.send(data), self.loop)
             except Exception:
-                # If the websocket is closed or the loop is shut down
-                # ignore the error.
+                # ignore broken sockets; they will be removed on disconnect
+                pass
+
+    def send_to_user(self, uid: str, message: dict) -> None:
+        """
+        Send a JSON message to all WebSocket connections associated with a
+        specific user.  If the user has multiple devices connected,
+        each active connection will receive the message.
+
+        :param uid: The user identifier (courier ID) to which the
+            message should be delivered.
+        :param message: A JSON‑serializable dictionary representing the
+            payload to send.
+        """
+        if not uid:
+            return
+        ws_set = self.clients_by_user.get(uid)
+        if not ws_set:
+            return
+        data = json.dumps(message)
+        for ws in list(ws_set):
+            try:
+                asyncio.run_coroutine_threadsafe(ws.send(data), self.loop)
+            except Exception:
+                # ignore broken sockets; cleanup occurs in handler
                 pass
 
 
