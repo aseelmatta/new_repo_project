@@ -2,8 +2,16 @@
 
 from celery_app import celery
 import math
+import os
+import requests
 from firebase_admin import firestore
 from firebase_init import db  # make sure firebase is initialized here
+
+# Optional: configure where to send the internal notify
+WS_NOTIFY_URL = os.environ.get(
+    "WS_NOTIFY_URL",
+    "http://127.0.0.1:5001/internal/ws/notify"
+)
 
 def haversine_distance(lat1, lng1, lat2, lng2):
     R = 6371.0  # Earth radius in km
@@ -22,6 +30,7 @@ def haversine_distance(lat1, lng1, lat2, lng2):
 def match_and_assign_courier(delivery_id):
     """
     Find the nearest courier for the given delivery_id and update Firestore.
+    Then notify ONLY the assigned courier via the app's internal WS notify endpoint.
     """
     delivery_ref = db.collection('deliveries').document(delivery_id)
     delivery_doc = delivery_ref.get()
@@ -57,17 +66,53 @@ def match_and_assign_courier(delivery_id):
         delivery_count = sum(1 for _ in active_deliveries)
         if delivery_count >= 2:
             continue
+
         dist = haversine_distance(lat1, lng1, lat2, lng2)
         if best_dist is None or dist < best_dist:
             best_dist = dist
             best_courier = courier_uid
 
     if best_courier:
-        # Update the delivery document to assign the courier
+        # 1) Persist the assignment
         delivery_ref.update({
             'assignedCourier': best_courier,
             'status': 'accepted',
             'timestampUpdated': firestore.SERVER_TIMESTAMP
         })
+
+        # 2) Prepare payload for the driver
+        dropoff = data.get('dropoffLocation') or {}
+        payload = {
+            "event": "delivery_assigned",
+            "delivery_id": delivery_id,
+            "courier_id": best_courier,
+            "pickup": {
+                "lat": lat1, "lng": lng1,
+                "address": data.get("pickupAddress")
+            },
+            "dropoff": {
+                "lat": dropoff.get("lat"),
+                "lng": dropoff.get("lng"),
+                "address": data.get("dropoffAddress")
+            },
+            "created_by": data.get("createdBy"),
+        }
+
+        # 3) Notify ONLY the assigned courier via internal HTTP endpoint in app.py
+        #    (Avoids starting a second WS server in the Celery process.)
+        try:
+            resp = requests.post(
+                WS_NOTIFY_URL,
+                json={"uid": best_courier, "message": payload},
+                timeout=3.0,
+            )
+            resp.raise_for_status()
+        except Exception as e:
+            # Best-effort: don't fail the task if notify fails
+            print(f"[WS notify] failed for courier {best_courier}: {e}")
+
+        # (Old direct WS call for reference; keep commented)
+        # from websocket_manager import manager
+        # manager.send_to_user(best_courier, payload)
 
     return {'assignedCourier': best_courier or None}

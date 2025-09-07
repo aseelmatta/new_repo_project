@@ -46,6 +46,9 @@ class _CourierDashboardState extends State<CourierDashboard> {
   int _currentIndex = 0; // For bottom navigation
   PageController? _pageController;
 
+  // Subscription to listen for real‑time updates over WebSockets
+  StreamSubscription<Map<String, dynamic>>? _wsSub;
+
   @override
   void initState() {
     super.initState();
@@ -53,10 +56,27 @@ class _CourierDashboardState extends State<CourierDashboard> {
     _loadDeliveries();
     _updateOperationalAreaCircle();
     _startLocationUpdates();
+
+    // Subscribe to WebSocket events for new assignments and status updates.
+    // When a relevant event arrives, refresh the list of deliveries.
+    DeliveryService.connectForUpdates().then((stream) {
+      _wsSub = stream.listen((event) {
+        final type = event['event'];
+        // If a new delivery is assigned to this courier or if the status of any
+        // delivery has changed, reload the deliveries from the backend.  In
+        // production you might inspect the event payload (e.g. event['courier_id'])
+        // and update state more selectively.
+        if (type == 'delivery_assigned' || type == 'new_delivery' || type == 'delivery_status_update') {
+          _loadDeliveries();
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
+    // Cancel the WebSocket subscription when the dashboard is destroyed
+    _wsSub?.cancel();
     _positionSub?.cancel();
     _pageController?.dispose();
     super.dispose();
@@ -137,7 +157,12 @@ class _CourierDashboardState extends State<CourierDashboard> {
       .then((resp) {
         if (!resp.success) print("Failed to update location: ${resp.error}");
       });
-       // **reload any newly-assigned jobs**  
+    // NOTE: Previously we reloaded deliveries on every location update to
+    // discover new assignments.  With WebSocket notifications, this polling
+    // is no longer needed.  The call below is kept for reference but is
+    // commented out.  When an assignment occurs the server will emit a
+    // WebSocket event that triggers a refresh in the initState subscription.
+    /*
     DeliveryService.getDeliveries().then((resp) {
       if (resp.success) {
         setState(() {
@@ -145,6 +170,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
         });
       }
     });
+    */
         // — PICKUP DETECTION —
   for (var delivery in _allDeliveries) {
     if (delivery.status == 'accepted') {

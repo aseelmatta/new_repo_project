@@ -12,7 +12,7 @@ from firebase_init import db
 from google.cloud import firestore
 
 from tasks.delivery_tasks import match_and_assign_courier
-
+from websocket_manager import manager
 app = Flask(__name__)
 CORS(app)  
 @app.route('/health', methods=['GET'])
@@ -726,6 +726,23 @@ def auth_facebook():
 
 
 
+
+
+
+
+
+
+
+
+@app.post("/internal/ws/notify")
+def ws_notify():
+    body = request.get_json(force=True) or {}
+    uid = body.get("uid")
+    msg = body.get("message")
+    if uid and msg:
+        manager.send_to_user(uid, msg)
+        return {"ok": True}
+    return {"ok": False, "error": "uid and message required"}, 400
 
 # ------------------------
 # RUN THE APP
