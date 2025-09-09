@@ -157,7 +157,7 @@ class _CourierSetupPageState extends State<CourierSetupPage> {
   void _saveUserData(Map<String, dynamic> userData) async {
     bool success = await AuthService.createUserProfile(userData);
     if (success) {
-      print('✅ Courier user data saved to backend.');
+      //print('✅ Courier user data saved to backend.');
     } else {
       print('❌ Failed to save courier user data to backend.');
       // Optionally show an error to the user

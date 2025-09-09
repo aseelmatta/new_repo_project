@@ -2,9 +2,13 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/delivery.dart';
 import 'auth_service.dart';
+import 'websocket_service.dart';
 
 class DeliveryService {
   static const String API_BASE_URL = 'http://10.0.2.2:5001'; // Match your auth service
+  static final WebSocketService _ws = WebSocketService();
+  static Stream<Map<String, dynamic>>? _updates;
+  static Stream<Map<String, dynamic>>? get updates => _updates;
 
   // Create a new delivery
   static Future<ApiResponse<String>> createDelivery({
@@ -14,9 +18,9 @@ class DeliveryService {
     required String recipientPhone,
     String instructions = '',
   }) async {
-      print('🛠️ createDelivery() called with: '
-        'pickup=$pickupLocation, dropoff=$dropoffLocation, '
-        'recipient=$recipientName');
+     // print('🛠️ createDelivery() called with: '
+     //   'pickup=$pickupLocation, dropoff=$dropoffLocation, '
+      //  'recipient=$recipientName');
     try {
       String? token = await AuthService.getToken();
       if (token == null) {
@@ -51,7 +55,7 @@ class DeliveryService {
         }
         return ApiResponse.error(responseData['error'] ?? 'Failed to create delivery');
       }
-      print('🛠️ createDelivery() HTTP ${response.statusCode}: ${response.body}');
+      //print('🛠️ createDelivery() HTTP ${response.statusCode}: ${response.body}');
       return ApiResponse.error('Failed to create delivery');
       
     } catch (e) {
@@ -63,7 +67,7 @@ class DeliveryService {
   // Get all deliveries for the current user
   static Future<ApiResponse<List<Delivery>>> getDeliveries() async {
     try {
-      print('▶️ getDeliveries calling GET $API_BASE_URL/getDeliveries');
+      //print('▶️ getDeliveries calling GET $API_BASE_URL/getDeliveries');
 
       String? token = await AuthService.getToken();
       if (token == null) {
@@ -77,7 +81,7 @@ class DeliveryService {
           'Content-Type': 'application/json',
         },
       );
-      print('◀️ getDeliveries response ${response.statusCode}: ${response.body}');
+      //print('◀️ getDeliveries response ${response.statusCode}: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -127,8 +131,8 @@ class DeliveryService {
   }
 
 
-static Future<void> cancelDelivery(String id, String token) async {
-    print('[Service] DELETE /deleteDelivery/$id');
+  static Future<void> cancelDelivery(String id, String token) async {
+   // print('[Service] DELETE /deleteDelivery/$id');
     
     final url = Uri.parse('$API_BASE_URL/deleteDelivery/$id');
     final response = await http.delete(
@@ -138,7 +142,7 @@ static Future<void> cancelDelivery(String id, String token) async {
         'Authorization': 'Bearer $token', // if you use tokens
       },
     );
-    print('[Service] got ${response.statusCode}: ${response.body}');
+    //print('[Service] got ${response.statusCode}: ${response.body}');
     if (response.statusCode != 200) {
       throw Exception('Failed to cancel delivery: ${response.statusCode} ${response.body}');
     }
@@ -212,22 +216,45 @@ static Future<void> cancelDelivery(String id, String token) async {
   }
 
   /// Fetch the current lat/lng for a courier from your backend
-static Future<ApiResponse<Map<String,double>>> getCourierLocation(String courierId) async {
-  final token = await AuthService.getToken();
-  final res = await http.get(
-    Uri.parse('$API_BASE_URL/couriers/$courierId/location'),
-    headers: {'Authorization':'Bearer $token'},
-  );
-  if (res.statusCode == 200) {
-    final data = jsonDecode(res.body);
-    return ApiResponse.success({
-      'lat': (data['latitude'] as num).toDouble(),
-      'lng': (data['longitude'] as num).toDouble(),
-    });
-  } else {
-    return ApiResponse.error('Failed to fetch location');
+  static Future<ApiResponse<Map<String,double>>> getCourierLocation(String courierId) async {
+    final token = await AuthService.getToken();
+    final res = await http.get(
+      Uri.parse('$API_BASE_URL/couriers/$courierId/location'),
+      headers: {'Authorization':'Bearer $token'},
+    );
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      return ApiResponse.success({
+        'lat': (data['latitude'] as num).toDouble(),
+        'lng': (data['longitude'] as num).toDouble(),
+      });
+    } else {
+      return ApiResponse.error('Failed to fetch location');
+    }
   }
-}
+  //conect to the websocket
+  static Future<Stream<Map<String, dynamic>>> connectForUpdates() async {
+    if (_updates != null) return _updates!;
+    // Build ws url: http://host:5001 -> ws://host:6789
+    final base = API_BASE_URL.replaceFirst(RegExp(r'^http'), 'ws');
+    final wsUrl = base.replaceFirst(RegExp(r':\d+$'), ':6789');
+    _ws.connect(wsUrl);
+    final uid = await AuthService.getUid(); // already saved at login
+    if (uid != null) {
+      _ws.registerUser(uid); // sends {"type":"register","uid":uid}
+    }
+    // make it broadcast so multiple listeners can attach safely
+    _updates = _ws.messages.asBroadcastStream();
+    print('WS REGISTERING UID: $uid'); // 🔍 helps target curl tests
+    return _updates!;
+  }
+  //disconnect from the websocket 
+  static void disconnectUpdates() {
+    _ws.disconnect();
+    _updates = null;
+  }
+
+
 
 }
 

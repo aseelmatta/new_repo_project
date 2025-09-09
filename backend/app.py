@@ -12,7 +12,7 @@ from firebase_init import db
 from google.cloud import firestore
 
 from tasks.delivery_tasks import match_and_assign_courier
-
+from websocket_manager import manager
 app = Flask(__name__)
 CORS(app)  
 @app.route('/health', methods=['GET'])
@@ -725,6 +725,27 @@ def auth_facebook():
         return jsonify({'success': False, 'error': str(e)}), 401
 
 
+@app.post("/internal/ws/notify")
+def ws_notify():
+    body = request.get_json(force=True) or {}
+    uid = body.get("uid")
+    msg = body.get("message")
+    if uid and msg:
+        manager.send_to_user(uid, msg)
+        return {"ok": True}
+    return {"ok": False, "error": "uid and message required"}, 400
+
+@app.post("/internal/ws/broadcast")
+def ws_broadcast():
+    body = request.get_json(force=True) or {}
+    msg = body.get("message") or {"event": "debug_broadcast", "msg": "to all"}
+    try:
+        # how many clients we think are connected
+        count = len(getattr(manager, "connected_clients", []))
+        manager.broadcast(msg)
+        return jsonify(ok=True, broadcast_to=count)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
 
 
 # ------------------------
@@ -732,4 +753,8 @@ def auth_facebook():
 # ------------------------
 
 if __name__ == '__main__':
+    import os
+    # Start WS server only in the reloader's main process
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        manager.start()
     app.run(host='0.0.0.0', port=5001, debug=True)
