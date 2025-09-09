@@ -13,7 +13,80 @@ from google.cloud import firestore
 
 from tasks.delivery_tasks import match_and_assign_courier
 from websocket_manager import manager
+from flasgger import Swagger
+
 app = Flask(__name__)
+app.config["SWAGGER"] = {"uiversion": 3}  # UI only
+
+swagger = Swagger(
+    app,
+    config={
+        "headers": [],
+        "openapi": "3.0.0",
+        "specs": [
+            {
+                "endpoint": "apispec_1",
+                "route": "/apispec_1.json",
+                "rule_filter": lambda rule: True,   # include all routes
+                "model_filter": lambda tag: True,   # include all models
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/apidocs/",
+    },
+    template={
+        "openapi": "3.0.0",
+        "info": {"title": "FETCH API", "version": "1.0.0",
+                 "description": "Docs for business and courier apps"},
+        "components": {
+            "securitySchemes": {
+                "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+            },
+            "schemas": {
+                "Delivery": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "createdBy": {"type": "string"},
+                        "assignedCourier": {"type": "string", "nullable": True},
+                        "status": {"type": "string", "enum":
+                                   ["pending","accepted","in_progress","completed","cancelled"]},
+                        "pickupAddress": {"type": "string"},
+                        "dropoffAddress": {"type": "string"},
+                        "pickupLocation": {"type": "object",
+                            "properties": {"lat":{"type":"number"}, "lng":{"type":"number"}}},
+                        "dropoffLocation": {"type": "object",
+                            "properties": {"lat":{"type":"number"}, "lng":{"type":"number"}}},
+                        "timestampUpdated": {"type": "string", "format": "date-time"}
+                    },
+                    "required": ["id","createdBy","status","pickupLocation","dropoffLocation"]
+                },
+                "Error": {"type": "object",
+                          "properties": {"success":{"type":"boolean"}, "error":{"type":"string"}}},
+                "DeliveriesResponse": {
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "deliveries": {"type": "array",
+                                       "items": {"$ref":"#/components/schemas/Delivery"}}
+                    }
+                }
+            }
+        },
+        "security": [{"BearerAuth": []}],
+        "tags": [
+            {"name":"Auth","description":"Authentication"},
+            {"name":"Deliveries","description":"Business and courier operations"},
+            {"name":"Internal","description":"Internal utilities"}
+        ]
+    }
+)
+
+# hard-stop any Swagger 2 leftovers if present
+for k in ("swagger", "basePath", "schemes", "definitions", "parameters", "responses"):
+    swagger.template.pop(k, None)
+
 CORS(app)  
 @app.route('/health', methods=['GET'])
 def health():
@@ -123,113 +196,6 @@ def update_user_profile():
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# ------------------------
-# ORDERS ENDPOINTS
-# ------------------------
-
-# @app.route('/getOrders', methods=['GET'])
-# @require_token
-# def get_orders():
-#     try:
-#         orders_ref = db.collection('orders')
-#         docs = orders_ref.stream()
-
-#         orders_list = []
-#         for doc in docs:
-#             o = Order.from_dict(doc.to_dict(), doc.id)
-#             orders_list.append({'id': o.id, **o.to_dict()})
-
-#         return jsonify({'success': True, 'orders': orders_list}), 200
-
-#     except Exception as e:
-#         return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# @app.route('/getOrder/<order_id>', methods=['GET'])
-# @require_token
-# def get_order(order_id):
-#     try:
-#         doc_ref = db.collection('orders').document(order_id)
-#         doc = doc_ref.get()
-#         if not doc.exists:
-#             return jsonify({'success': False, 'error': 'Order not found'}), 404
-
-#         o = Order.from_dict(doc.to_dict(), doc.id)
-#         return jsonify({'success': True, 'order': {'id': o.id, **o.to_dict()}}), 200
-
-#     except Exception as e:
-#         return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# @app.route('/createOrder', methods=['POST'])
-# @require_token
-# def create_order():
-#     try:
-#         data = request.get_json()
-#         if not data:
-#             return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
-
-#         # Required fields: customer (str), items (list)
-#         customer = data.get('customer')
-#         items = data.get('items')
-#         status = data.get('status', 'pending')
-#         carrier_id = data.get('carrier_id')
-#         business_id = data.get('business_id')
-
-#         if not customer or items is None:
-#             return jsonify({'success': False, 'error': 'Missing required fields'}), 400
-
-#         new_order = Order(
-#             customer = customer,
-#             items = items,
-#             status = status,
-#             carrier_id = carrier_id,
-#             business_id = business_id
-#         )
-#         _, doc_ref = db.collection('orders').add(new_order.to_dict())
-#         return jsonify({'success': True, 'order_id': doc_ref.id}), 201
-
-#     except Exception as e:
-#         return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# @app.route('/updateOrder/<order_id>', methods=['PUT'])
-# @require_token
-# def update_order(order_id):
-#     try:
-#         data = request.get_json()
-#         if not data:
-#             return jsonify({'success': False, 'error': 'No JSON body provided'}), 400
-
-#         doc_ref = db.collection('orders').document(order_id)
-#         snapshot = doc_ref.get()
-#         if not snapshot.exists:
-#             return jsonify({'success': False, 'error': 'Order not found'}), 404
-
-#         updates = {}
-#         if 'customer' in data:
-#             updates['customer'] = data['customer']
-#         if 'items' in data:
-#             updates['items'] = data['items']
-#         if 'status' in data:
-#             updates['status'] = data['status']
-#         if 'carrier_id' in data:
-#             updates['carrier_id'] = data['carrier_id']
-#         if 'business_id' in data:
-#             updates['business_id'] = data['business_id']
-
-#         if not updates:
-#             return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
-
-#         doc_ref.update(updates)
-#         return jsonify({'success': True}), 200
-
-#     except Exception as e:
-#         return jsonify({'success': False, 'error': str(e)}), 500
-
-
 
 # ------------------------
 # CARRIERS ENDPOINTS
@@ -541,9 +507,30 @@ def create_delivery():
 @require_token
 def get_deliveries():
     """
-    Returns a list of deliveries:
-      - If the user’s role is “business”, returns deliveries where createdBy == uid
-      - If the user’s role is “courier”, returns deliveries where assignedCourier == uid
+    Get deliveries for the current user
+    ---
+    tags: [Deliveries]
+    security:
+      - BearerAuth: []
+    responses:
+      200:
+        description: Deliveries list
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeliveriesResponse'
+      401:
+        description: Unauthorized or token expired
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      404:
+        description: Profile not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
     """
     try:
         uid = request.uid
@@ -599,8 +586,54 @@ def get_delivery(delivery_id):
 @require_token
 def update_delivery_status(delivery_id):
     """
-    Allows the assigned courier to update the status of their delivery.
-    Expected JSON body: { "status": "<newStatus>" }
+    Update delivery status (courier only)
+    ---
+    tags: [Deliveries]
+    security:
+      - BearerAuth: []
+    parameters:
+      - in: path
+        name: delivery_id
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [accepted, in_progress, completed, cancelled]
+            required: [status]
+    responses:
+      200:
+        description: Updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+      400:
+        description: Missing fields or invalid role
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      403:
+        description: Forbidden
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
+      404:
+        description: Delivery not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Error'
     """
     try:
         data = request.get_json() or {}
@@ -739,8 +772,38 @@ def auth_facebook():
         return jsonify({'success': False, 'error': str(e)}), 401
 
 
-@app.post("/internal/ws/notify")
-def ws_notify():
+@app.post('/internal/ws/notify')
+def internal_ws_notify():
+    """
+    Internal: fan-out a WS message to a specific user
+    ---
+    tags: [Internal]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              uid: { type: string }
+              message:
+                type: object
+                description: Arbitrary JSON payload, e.g. WS event
+                example:
+                  event: delivery_assigned
+                  delivery_id: abc123
+            required: [uid, message]
+    responses:
+      200:
+        description: Sent
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ok: { type: boolean }
+                sent: { type: integer }
+    """
     body = request.get_json(force=True) or {}
     uid = body.get("uid")
     msg = body.get("message")
