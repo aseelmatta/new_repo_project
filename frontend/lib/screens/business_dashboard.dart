@@ -8,7 +8,7 @@ import 'delivery_tracking_page.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
-
+import 'dart:async';
 class BusinessDashboard extends StatefulWidget {
   const BusinessDashboard({super.key});
 
@@ -30,16 +30,35 @@ class _BusinessDashboardState extends State<BusinessDashboard> {
   int _currentIndex = 0;
 
   PageController? _pageController;
-
+  StreamSubscription? _wsSub;
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
     _loadDeliveries();
+
+    DeliveryService.connectForUpdates().then((stream) {
+    _wsSub = stream.listen((event) {
+      print('WS EVENT [business]: $event');
+      final ev = event['event'];
+
+      // handle both spellings used elsewhere
+      if (ev == 'delivery_created' ||
+          ev == 'delivery_assigned' ||
+          ev == 'delivery_cancelled' ||
+          ev == 'delivery_status_update' ||   // courier-side name
+          ev == 'delivery_status_updated') {  // backend name
+        _loadDeliveries(); // simplest and correct
+      }
+    }, onError: (e) {
+      print('WS error: $e');
+    });
+  });
   }
 
   @override
   void dispose() {
+    _wsSub?.cancel();
     _pageController?.dispose();
     super.dispose();
   }

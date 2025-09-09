@@ -534,7 +534,7 @@ def create_delivery():
     # Enqueue the background task that finds & assigns the nearest courier
     match_and_assign_courier.delay(delivery_id)
 
-    return jsonify({'success': True, 'delivery_id': delivery_id}), 201
+    return jsonify({'success': True, 'delivery_id': delivery_id}), 200
 
 
 @app.route('/getDeliveries', methods=['GET'])
@@ -625,7 +625,21 @@ def update_delivery_status(delivery_id):
             'status': new_status,
             'timestampUpdated': firestore.SERVER_TIMESTAMP
         })
-
+        business_uid = delivery.get('createdBy')    # fallback if you store creator uid
+        payload = {
+            'event': 'delivery_status_updated',
+            'delivery_id': delivery_id,
+            'status': new_status,
+            'assignedCourier': assigned,
+        }
+        try:
+            if business_uid:
+                manager.send_to_user(business_uid, payload)
+            # If you also want to reflect it on courier devices:
+            manager.send_to_user(assigned, payload)
+        except Exception:
+            # Non-fatal: WS failures shouldn't block the HTTP success path
+            pass
         if new_status == 'in_progress':
             doc_ref.update({
             'timestampPickedUp' : firestore.SERVER_TIMESTAMP
@@ -634,7 +648,7 @@ def update_delivery_status(delivery_id):
             doc_ref.update({
             'timestampDelivered': firestore.SERVER_TIMESTAMP
             })
-
+        
             pending = db.collection('deliveries') \
                 .where('status', '==', 'pending') \
                 .stream()
