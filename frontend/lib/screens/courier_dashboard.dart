@@ -30,7 +30,7 @@ class CourierDashboard extends StatefulWidget {
 class _CourierDashboardState extends State<CourierDashboard> {
   DateTime _lastSentToServer = DateTime.fromMillisecondsSinceEpoch(0);
   
-
+  
   List<Delivery> _allDeliveries = [];
   List<Delivery> _availableDeliveries = [];
   List<Delivery> _myDeliveries = [];
@@ -61,16 +61,16 @@ class _CourierDashboardState extends State<CourierDashboard> {
     // When a relevant event arrives, refresh the list of deliveries.
     DeliveryService.connectForUpdates().then((stream) {
       _wsSub = stream.listen((event) {
+        print('WS EVENT: $event'); // 🔍 added log
         final type = event['event'];
-        // If a new delivery is assigned to this courier or if the status of any
-        // delivery has changed, reload the deliveries from the backend.  In
-        // production you might inspect the event payload (e.g. event['courier_id'])
-        // and update state more selectively.
-        if (type == 'delivery_assigned' || type == 'new_delivery' || type == 'delivery_status_update') {
+        if (type == 'delivery_assigned' ||
+            type == 'new_delivery' ||
+            type == 'delivery_status_update') {
           _loadDeliveries();
         }
       });
     });
+
   }
 
   @override
@@ -114,7 +114,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
       ],
     ),
   );
-}
+ }
   Future<void> _startLocationUpdates() async {
     // 1. Request permission
     LocationPermission perm = await Geolocator.checkPermission();
@@ -293,7 +293,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
       },
     );
   });
-}
+ }
 
 
 
@@ -390,7 +390,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
       _recommendedDelivery = optimal;
     });
   }
-void _navigateToLocation(LatLng location, String type) async {
+ void _navigateToLocation(LatLng location, String type) async {
   final url = 'https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}&travelmode=driving&dir_action=navigate';
   
   try {
@@ -435,8 +435,8 @@ void _navigateToLocation(LatLng location, String type) async {
       ),
     );
   }
-}
-void _showDeliveryDetails(Delivery delivery) {
+ }
+ void _showDeliveryDetails(Delivery delivery) {
   bool isRecommended = _recommendedDelivery?.id == delivery.id;
   
   // Compute mid-point & markers for map
@@ -643,7 +643,7 @@ void _showDeliveryDetails(Delivery delivery) {
       );
     },
   );
-}
+  }
 
   void _onNavigationTap(int index) {
     setState(() {
@@ -664,8 +664,8 @@ void _showDeliveryDetails(Delivery delivery) {
           child: Column(
             children: [
               // Status indicator
-// Status indicator with responsive layout
-Container(
+ // Status indicator with responsive layout
+ Container(
   width: double.infinity,
   padding: const EdgeInsets.all(12),
   decoration: BoxDecoration(
@@ -760,7 +760,7 @@ Container(
       }
     },
   ),
-),
+ ),
               
               const SizedBox(height: 8),
               

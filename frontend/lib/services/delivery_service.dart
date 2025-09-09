@@ -18,9 +18,9 @@ class DeliveryService {
     required String recipientPhone,
     String instructions = '',
   }) async {
-      print('🛠️ createDelivery() called with: '
-        'pickup=$pickupLocation, dropoff=$dropoffLocation, '
-        'recipient=$recipientName');
+     // print('🛠️ createDelivery() called with: '
+     //   'pickup=$pickupLocation, dropoff=$dropoffLocation, '
+      //  'recipient=$recipientName');
     try {
       String? token = await AuthService.getToken();
       if (token == null) {
@@ -55,7 +55,7 @@ class DeliveryService {
         }
         return ApiResponse.error(responseData['error'] ?? 'Failed to create delivery');
       }
-      print('🛠️ createDelivery() HTTP ${response.statusCode}: ${response.body}');
+      //print('🛠️ createDelivery() HTTP ${response.statusCode}: ${response.body}');
       return ApiResponse.error('Failed to create delivery');
       
     } catch (e) {
@@ -67,7 +67,7 @@ class DeliveryService {
   // Get all deliveries for the current user
   static Future<ApiResponse<List<Delivery>>> getDeliveries() async {
     try {
-      print('▶️ getDeliveries calling GET $API_BASE_URL/getDeliveries');
+      //print('▶️ getDeliveries calling GET $API_BASE_URL/getDeliveries');
 
       String? token = await AuthService.getToken();
       if (token == null) {
@@ -81,7 +81,7 @@ class DeliveryService {
           'Content-Type': 'application/json',
         },
       );
-      print('◀️ getDeliveries response ${response.statusCode}: ${response.body}');
+      //print('◀️ getDeliveries response ${response.statusCode}: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -132,7 +132,7 @@ class DeliveryService {
 
 
   static Future<void> cancelDelivery(String id, String token) async {
-    print('[Service] DELETE /deleteDelivery/$id');
+   // print('[Service] DELETE /deleteDelivery/$id');
     
     final url = Uri.parse('$API_BASE_URL/deleteDelivery/$id');
     final response = await http.delete(
@@ -142,7 +142,7 @@ class DeliveryService {
         'Authorization': 'Bearer $token', // if you use tokens
       },
     );
-    print('[Service] got ${response.statusCode}: ${response.body}');
+    //print('[Service] got ${response.statusCode}: ${response.body}');
     if (response.statusCode != 200) {
       throw Exception('Failed to cancel delivery: ${response.statusCode} ${response.body}');
     }
@@ -245,6 +245,7 @@ class DeliveryService {
     }
     // make it broadcast so multiple listeners can attach safely
     _updates = _ws.messages.asBroadcastStream();
+    print('WS REGISTERING UID: $uid'); // 🔍 helps target curl tests
     return _updates!;
   }
   //disconnect from the websocket 
