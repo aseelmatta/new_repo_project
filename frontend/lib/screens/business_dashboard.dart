@@ -8,6 +8,8 @@ import 'delivery_tracking_page.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 
 class BusinessDashboard extends StatefulWidget {
   const BusinessDashboard({super.key});
@@ -1083,119 +1085,137 @@ void _showDeliveryDetails(Delivery delivery) {
     GoogleMapController? mapController;
 
     void showMapSelector(BuildContext context, bool isPickup) {
-      selectingPickup = isPickup;
+  selectingPickup = isPickup;
 
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder:
-            (context) => StatefulBuilder(
-              builder:
-                  (context, setModalState) => Container(
-                    height: MediaQuery.of(context).size.height * 0.8,
-                    child: Column(
-                      children: [
-                        AppBar(
-                          title: Text(
-                            'Select ${isPickup ? 'Pickup' : 'Dropoff'} Location',
-                          ),
-                          leading: IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  if (selectingPickup &&
-                                      _pickupLocation != null) {
-                                    _pickupAddress =
-                                        'Location at ${_pickupLocation!.latitude.toStringAsFixed(4)}, ${_pickupLocation!.longitude.toStringAsFixed(4)}';
-                                    pickupController.text = _pickupAddress;
-                                  } else if (!selectingPickup &&
-                                      _dropoffLocation != null) {
-                                    _dropoffAddress =
-                                        'Location at ${_dropoffLocation!.latitude.toStringAsFixed(4)}, ${_dropoffLocation!.longitude.toStringAsFixed(4)}';
-                                    dropoffController.text = _dropoffAddress;
-                                  }
-                                });
-                                Navigator.pop(context);
-                              },
-                              child: const Text(
-                                'CONFIRM',
-                                style: TextStyle(color: Colors.blue),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: TextField(
-                            decoration: InputDecoration(
-                              hintText: 'Search for a location...',
-                              prefixIcon: const Icon(Icons.search),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 0,
-                              ),
-                            ),
-                            onSubmitted: (value) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Search functionality would connect to Places API',
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        Expanded(
-                          child: GoogleMap(
-                            initialCameraPosition: const CameraPosition(
-                              target: LatLng(37.4219999, -122.0840575),
-                              zoom: 14,
-                            ),
-                            onMapCreated: (GoogleMapController controller) {
-                              mapController = controller;
-                            },
-                            markers: {
-                              if (selectingPickup && _pickupLocation != null)
-                                Marker(
-                                  markerId: const MarkerId('pickup'),
-                                  position: _pickupLocation!,
-                                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                                    BitmapDescriptor.hueGreen,
-                                  ),
-                                ),
-                              if (!selectingPickup && _dropoffLocation != null)
-                                Marker(
-                                  markerId: const MarkerId('dropoff'),
-                                  position: _dropoffLocation!,
-                                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                                    BitmapDescriptor.hueRed,
-                                  ),
-                                ),
-                            },
-                            onTap: (LatLng location) {
-                              setModalState(() {
-                                if (selectingPickup) {
-                                  _pickupLocation = location;
-                                } else {
-                                  _dropoffLocation = location;
-                                }
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setModalState) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: Column(
+          children: [
+            AppBar(
+              title: Text(
+                'Select ${isPickup ? 'Pickup' : 'Dropoff'} Location',
+              ),
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      if (selectingPickup && _pickupLocation != null) {
+                        _pickupAddress =
+                            'Location at ${_pickupLocation!.latitude.toStringAsFixed(4)}, ${_pickupLocation!.longitude.toStringAsFixed(4)}';
+                        pickupController.text = _pickupAddress;
+                      } else if (!selectingPickup && _dropoffLocation != null) {
+                        _dropoffAddress =
+                            'Location at ${_dropoffLocation!.latitude.toStringAsFixed(4)}, ${_dropoffLocation!.longitude.toStringAsFixed(4)}';
+                        dropoffController.text = _dropoffAddress;
+                      }
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'CONFIRM',
+                    style: TextStyle(color: Colors.blue),
                   ),
+                ),
+              ],
             ),
-      );
-    }
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search for a location...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 0,
+                  ),
+                ),
+                onSubmitted: (value) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Search functionality would connect to Places API',
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Expanded(
+              child: GoogleMap(
+                initialCameraPosition: const CameraPosition(
+                  target: LatLng(37.4219999, -122.0840575),
+                  zoom: 14,
+                ),
+                // FIXED: Enable all gesture recognizers for proper map interaction
+                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                  Factory<OneSequenceGestureRecognizer>(
+                    () => EagerGestureRecognizer(),
+                  ),
+                },
+                // FIXED: Enable scroll gestures to allow panning
+                scrollGesturesEnabled: true,
+                // FIXED: Enable zoom gestures
+                zoomGesturesEnabled: true,
+                // FIXED: Enable tilt gestures
+                tiltGesturesEnabled: true,
+                // FIXED: Enable rotation gestures
+                rotateGesturesEnabled: true,
+                // Enable zoom controls
+                zoomControlsEnabled: true,
+                // Enable map toolbar
+                mapToolbarEnabled: true,
+                // Enable compass
+                compassEnabled: true,
+                // Set map type
+                mapType: MapType.normal,
+                onMapCreated: (GoogleMapController controller) {
+                  mapController = controller;
+                },
+                markers: {
+                  if (selectingPickup && _pickupLocation != null)
+                    Marker(
+                      markerId: const MarkerId('pickup'),
+                      position: _pickupLocation!,
+                      icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueGreen,
+                      ),
+                    ),
+                  if (!selectingPickup && _dropoffLocation != null)
+                    Marker(
+                      markerId: const MarkerId('dropoff'),
+                      position: _dropoffLocation!,
+                      icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueRed,
+                      ),
+                    ),
+                },
+                onTap: (LatLng location) {
+                  setModalState(() {
+                    if (selectingPickup) {
+                      _pickupLocation = location;
+                    } else {
+                      _dropoffLocation = location;
+                    }
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
     showModalBottomSheet(
       context: context,
