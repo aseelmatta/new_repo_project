@@ -6,7 +6,7 @@ import '../models/delivery.dart';
 import '../services/delivery_service.dart';
 import 'courier_history_page.dart';
 import 'courier_profile_page.dart';
-
+import 'dart:convert';
 import 'dart:async';                  // for StreamSubscription
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -304,6 +304,9 @@ class _CourierDashboardState extends State<CourierDashboard> {
     // 1. Fetch all deliveries from the backend
     final resp = await DeliveryService.getDeliveries();
     print('helloooooooooo');
+    print('helloooooooooo');
+    print('helloooooooooo');
+    print('helloooooooooo');
     // 2. If there was an error, show it and stop
     if (!resp.success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -332,7 +335,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
           delivery.pickupLocation.latitude,
           delivery.pickupLocation.longitude,
         );
-        return distance <= _operationalRadius && delivery.status == 'pending'|| delivery.status == 'accepted'||
+        return delivery.status == 'pending'|| delivery.status == 'accepted'||
          delivery.status == 'in_progress';
       }).toList();
     });

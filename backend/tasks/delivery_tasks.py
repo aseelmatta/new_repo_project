@@ -36,40 +36,16 @@ def _ws_notify(uid: str, message: dict) -> None:
         return
     try:
         r = requests.post(
-            WS_NOTIFY_URL,
+            "http://127.0.0.1:5001/internal/ws/notify",
             json={"uid": uid, "message": message},
             timeout=3.0,
         )
-        print(f"[WS notify] -> {WS_NOTIFY_URL} uid={uid} ev={message.get('event')} "
+        print(f"[WS notify] -> {"http://127.0.0.1:5001/internal/ws/notify"} uid={uid} ev={message.get('event')} "
               f"delivery_id={message.get('delivery_id')} status={r.status_code}")
         r.raise_for_status()
     except Exception as e:
         print(f"[WS notify] failed for uid={uid}: {e}")
 
-def _resolve_business_uids(delivery: dict) -> list[str]:
-    """
-    Determine which business user(s) to notify.
-    Prefers explicit user UID; falls back to creator; optionally expands an org.
-    """
-    uids: list[str] = []
-    # Common fields: businessUid or createdBy
-    business_uid = delivery.get("businessUid") or delivery.get("createdBy")
-    if business_uid:
-        uids.append(business_uid)
-
-    # Optional: if you store an org id and have a sub-collection of users
-    business_id = delivery.get("businessId")
-    if business_id:
-        try:
-            q = db.collection("business_users").where("businessId", "==", business_id).stream()
-            for doc in q:
-                # assume document id is the uid
-                uids.append(doc.id)
-        except Exception as e:
-            print(f"[WS notify] could not resolve business users for businessId={business_id}: {e}")
-
-    # Deduplicate
-    return list(dict.fromkeys([u for u in uids if u]))
 
 @celery.task(name="delivery_tasks.match_and_assign_courier")
 def match_and_assign_courier(delivery_id: str):
@@ -113,7 +89,7 @@ def match_and_assign_courier(delivery_id: str):
             )
             # Count without materializing full list
             active_count = sum(1 for _ in active_cursor)
-            if active_count >= 2:
+            if active_count >=2:
                 continue
 
             dist = haversine_distance(float(lat1), float(lng1), float(lat2), float(lng2))
@@ -125,7 +101,7 @@ def match_and_assign_courier(delivery_id: str):
             print(f"[assign] No eligible courier for delivery {delivery_id}")
             return {"assignedCourier": None}
 
-        # Persist assignment
+        # update the firestore 
         delivery_ref.update(
             {
                 "assignedCourier": best_courier,
@@ -135,11 +111,13 @@ def match_and_assign_courier(delivery_id: str):
         )
 
         # Build notify payloads
+        bussiness = data.get("createdBy")
         dropoff = data.get("dropoffLocation") or {}
         courier_msg = {
             "event": "delivery_assigned",
             "delivery_id": delivery_id,
             "courier_id": best_courier,
+            "status": "accepted",
             "pickup": {
                 "lat": lat1,
                 "lng": lng1,
@@ -159,16 +137,15 @@ def match_and_assign_courier(delivery_id: str):
             "status": "accepted",
             "assignedCourier": best_courier,
         }
-
-        # Notify courier
-        _ws_notify(best_courier, courier_msg)
+        # sending the courier that there is a new delivry for him
+        #_ws_notify(best_courier,courier_msg)
+        
 
         # Small delay can help if the courier app is still registering its WS
-        time.sleep(0.2)
+        #time.sleep(3)
 
-        # Notify business (one or many)
-        for buid in _resolve_business_uids(data):
-            _ws_notify(buid, business_msg)
+        # Notify business
+        #_ws_notify(bussiness, business_msg)
 
         return {"assignedCourier": best_courier}
 

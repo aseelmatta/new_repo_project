@@ -14,6 +14,7 @@ from google.cloud import firestore
 from tasks.delivery_tasks import match_and_assign_courier
 from websocket_manager import manager
 from flasgger import Swagger
+import uuid, decimal, datetime as dt
 
 app = Flask(__name__)
 app.config["SWAGGER"] = {"uiversion": 3}  # UI only
@@ -447,7 +448,26 @@ def update_location():
     })
     return jsonify({'success': True}), 200
 
+def _jsonable(x):
+    if isinstance(x, dt.datetime): return x.isoformat()
+    if isinstance(x, uuid.UUID): return str(x)
+    if isinstance(x, decimal.Decimal): return float(x)
+    # drop Firestore/server sentinels
+    if hasattr(x, "__class__") and x.__class__.__name__.lower().endswith("sentinel"):
+        return None
+    return x
 
+def _sanitize(obj):
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            if hasattr(v, "__class__") and v.__class__.__name__.lower().endswith("sentinel"):
+                continue
+            out[k] = _sanitize(v)
+        return out
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    return _jsonable(obj)
 
 @app.route('/createDelivery', methods=['POST'])
 @require_token
@@ -497,8 +517,43 @@ def create_delivery():
     doc_ref = db.collection('deliveries').add(delivery_data)[1]
     delivery_id = doc_ref.id
 
+    #manager.send_to_user(uid,delivery_data)
     # Enqueue the background task that finds & assigns the nearest courier
-    match_and_assign_courier.delay(delivery_id)
+    async_res = match_and_assign_courier.apply_async(args=[delivery_id])
+
+    # Try to get result quickly; fall back to async if slow
+    assigned_uid = None
+    try:
+        result = async_res.get(timeout=5)  # seconds
+        # Celery returns: {"assignedCourier": best_courier}
+        assigned_uid = result.get("assignedCourier") if isinstance(result, dict) else None
+    except Exception:
+        assigned_uid = None  # don’t block request
+
+    # Fetch current doc snapshot to send clean data
+    snap = doc_ref.get()
+    payload_delivery = {'id': delivery_id, **(snap.to_dict() or {})}
+    payload_delivery = _sanitize(payload_delivery)
+
+    # Notify business: always send a “created/updated” event
+    manager.send_to_user(uid, _sanitize({
+        'event': 'new_delivery',
+        'delivery': payload_delivery,
+    }))
+
+    # If assignment was ready fast, notify courier and business
+    print('we are going to notify the courier hehehehehehehehheheheheheehehe')
+    if assigned_uid:
+        manager.send_to_user(assigned_uid, _sanitize({
+            'event': 'delivery_assigned',
+            'delivery_id': delivery_id,
+        }))
+        manager.send_to_user(uid, _sanitize({
+            'event': 'delivery_status_update',
+            'delivery_id': delivery_id,
+            'assignedCourier': assigned_uid,
+            'status': 'pending',  # or whatever your worker sets
+        }))
 
     return jsonify({'success': True, 'delivery_id': delivery_id}), 200
 
@@ -807,6 +862,8 @@ def internal_ws_notify():
     body = request.get_json(force=True) or {}
     uid = body.get("uid")
     msg = body.get("message")
+    print(f"sending to {uid}")
+
     if uid and msg:
         manager.send_to_user(uid, msg)
         return {"ok": True}

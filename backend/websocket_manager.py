@@ -91,8 +91,8 @@ class WebSocketManager:
             try:
                 asyncio.run_coroutine_threadsafe(ws.send(data), self.loop)
             except Exception:
-                # ignore broken sockets; cleanup occurs in handler
-                pass
+               print('there is an error in send to user')
+               
 
 
 # Create a global manager instance and start the server.
