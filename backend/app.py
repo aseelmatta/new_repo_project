@@ -429,6 +429,18 @@ def get_courier_locations():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.get("/couriers/<uid>/location")
+@require_token
+def get_courier_location(uid):
+    snap = db.collection("courier_locations").document(uid).get()
+    if not snap.exists:
+        return jsonify({"success": False, "error": "not_found"}), 405
+    d = snap.to_dict() or {}
+    lat = d.get("lat") 
+    lng = d.get("lng")
+    if lat is None or lng is None:
+        return jsonify({"success": False, "error": "no_coords"}), 404
+    return jsonify({"success": True, "data": {"lat": float(lat), "lng": float(lng)}}), 200
 
 @app.route('/updateLocation', methods=['PUT'])
 @require_token

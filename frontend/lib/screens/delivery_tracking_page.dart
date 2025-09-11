@@ -61,6 +61,7 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
     super.initState();
     _currentDelivery = widget.delivery;
     _loadDeliveryDetails();
+    _startPeriodicUpdates();
     // We no longer start a periodic timer to poll the backend for
     // updates.  Instead, subscribe to WebSocket events so that
     // updates are pushed to us in real time.  The timer polling
@@ -71,34 +72,34 @@ class _DeliveryTrackingPageState extends State<DeliveryTrackingPage> {
     // DeliveryService.  When a status update or location update
     // pertaining to this delivery arrives, update our state.  The
     // stream is broadcast so multiple listeners can subscribe.
-    DeliveryService.connectForUpdates().then((stream) {
-      _wsSub = stream.listen((event) {
-        final type = event['event'];
-        if (type == null) return;
-        // When the delivery status changes or when the delivery is
-        // first assigned to a courier, refresh the delivery details.
-        // The event payload includes the delivery ID.
-        if ((type == 'delivery_status_update' || type == 'delivery_assigned') &&
-            event['delivery_id'] == _currentDelivery.id) {
-          _loadDeliveryDetails();
-        }
-        // When the courier's location changes, update the marker
-        // directly if this update corresponds to the assigned
-        // courier for this delivery.  The backend sends lat/lng in
-        // the event.
-        if (type == 'location_update' &&
-            event['courier_id'] == _currentDelivery.assignedCourier) {
-          final lat = event['lat'];
-          final lng = event['lng'];
-          if (lat is num && lng is num) {
-            setState(() {
-              _courierLocation = LatLng(lat.toDouble(), lng.toDouble());
-            });
-            _updateMapElements();
-          }
-        }
-      });
-    });
+    // DeliveryService.connectForUpdates().then((stream) {
+    //   _wsSub = stream.listen((event) {
+    //     final type = event['event'];
+    //     if (type == null) return;
+    //     // When the delivery status changes or when the delivery is
+    //     // first assigned to a courier, refresh the delivery details.
+    //     // The event payload includes the delivery ID.
+    //     if ((type == 'delivery_status_update' || type == 'delivery_assigned') &&
+    //         event['delivery_id'] == _currentDelivery.id) {
+    //       _loadDeliveryDetails();
+    //     }
+    //     // When the courier's location changes, update the marker
+    //     // directly if this update corresponds to the assigned
+    //     // courier for this delivery.  The backend sends lat/lng in
+    //     // the event.
+    //     if (type == 'location_update' &&
+    //         event['courier_id'] == _currentDelivery.assignedCourier) {
+    //       final lat = event['lat'];
+    //       final lng = event['lng'];
+    //       if (lat is num && lng is num) {
+    //         setState(() {
+    //           _courierLocation = LatLng(lat.toDouble(), lng.toDouble());
+    //         });
+    //         _updateMapElements();
+    //       }
+    //     }
+    //   });
+    // });
   }
 
   @override

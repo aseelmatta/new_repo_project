@@ -81,7 +81,7 @@ class DeliveryService {
           'Content-Type': 'application/json',
         },
       );
-      print('◀️ getDeliveries response ${response.statusCode}: ${response.body}');
+      //print('◀️ getDeliveries response ${response.statusCode}: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -215,23 +215,46 @@ class DeliveryService {
     }
   }
 
-  /// Fetch the current lat/lng for a courier from your backend
-  static Future<ApiResponse<Map<String,double>>> getCourierLocation(String courierId) async {
-    final token = await AuthService.getToken();
-    final res = await http.get(
-      Uri.parse('$API_BASE_URL/couriers/$courierId/location'),
-      headers: {'Authorization':'Bearer $token'},
-    );
-    if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
-      return ApiResponse.success({
-        'lat': (data['latitude'] as num).toDouble(),
-        'lng': (data['longitude'] as num).toDouble(),
-      });
-    } else {
-      return ApiResponse.error('Failed to fetch location');
+  // /// Fetch the current lat/lng for a courier from your backend
+  // static Future<ApiResponse<Map<String,double>>> getCourierLocation(String courierId) async {
+  //   final token = await AuthService.getToken();
+  //   final res = await http.get(
+  //     Uri.parse('$API_BASE_URL/couriers/$courierId/location'),
+  //     headers: {'Authorization':'Bearer $token'},
+  //   );
+  //   if (res.statusCode == 200) {
+  //     final data = jsonDecode(res.body);
+  //     return ApiResponse.success({
+  //       'lat': (data['lat'] as num).toDouble(),
+  //       'lng': (data['lng'] as num).toDouble(),
+  //     });
+  //   } else {
+  //     return ApiResponse.error('Failed to fetch location');
+  //   }
+  // }
+  static Future<ApiResponse<Map<String, double>>> getCourierLocation(String courierId) async {
+  final token = await AuthService.getToken();
+  final uri = Uri.parse('$API_BASE_URL/couriers/$courierId/location');
+  final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+
+  try {
+    final obj = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200 && obj['success'] == true && obj['data'] is Map) {
+      final d = Map<String, dynamic>.from(obj['data'] as Map);
+      // accept either lat/lng or latitude/longitude, and strings
+      num? latN = (d['lat'] ?? d['latitude']) as num?;
+      num? lngN = (d['lng'] ?? d['longitude']) as num?;
+      latN ??= double.tryParse('${d['lat'] ?? d['latitude']}');
+      lngN ??= double.tryParse('${d['lng'] ?? d['longitude']}');
+      if (latN == null || lngN == null) return ApiResponse.error('Missing coordinates');
+      return ApiResponse.success({'lat': latN.toDouble(), 'lng': lngN.toDouble()});
     }
+    return ApiResponse.error(obj['error']?.toString() ?? 'Failed to fetch location');
+  } catch (e) {
+    return ApiResponse.error('Bad response');
   }
+}
+
   //conect to the websocket
   static Future<Stream<Map<String, dynamic>>> connectForUpdates() async {
     if (_updates != null) return _updates!;
