@@ -24,7 +24,7 @@ class _BusinessChatPageState extends State<BusinessChatPage> {
   }
 
   Future<void> _initializeAI() async {
-    await GeminiAIService.initialize();
+    await GeminiAiService.initialize();
   }
 
   @override
@@ -77,7 +77,7 @@ class _BusinessChatPageState extends State<BusinessChatPage> {
         response = _getHumanResponse(userMessage);
       } else {
         // Use Gemini AI
-        response = await GeminiAIService.getResponse(userMessage);
+        response = await GeminiAiService.getResponseWithCodeKnowledge(userMessage);
       }
       
       setState(() {
@@ -123,7 +123,7 @@ class _BusinessChatPageState extends State<BusinessChatPage> {
 
   Future<String> _generateResponse(String message) async {
     // This method is now replaced by _getAIResponse
-    return await GeminiAIService.getResponse(message);
+    return await GeminiAiService.getResponseWithCodeKnowledge(message);
   }
 
   void _connectToHuman() {

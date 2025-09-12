@@ -12,7 +12,7 @@ void main() async {
   
   // Initialize services
   await AuthService.initialize();
-  await GeminiAIService.initialize();
+  await GeminiAiService.initialize();
   
   runApp(const MyApp());
 }
