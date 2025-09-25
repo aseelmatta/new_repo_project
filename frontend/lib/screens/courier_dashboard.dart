@@ -6,7 +6,7 @@ import '../models/delivery.dart';
 import '../services/delivery_service.dart';
 import 'courier_history_page.dart';
 import 'courier_profile_page.dart';
-
+import 'dart:convert';
 import 'dart:async';                  // for StreamSubscription
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,6 +34,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
   List<Delivery> _allDeliveries = [];
   List<Delivery> _availableDeliveries = [];
   List<Delivery> _myDeliveries = [];
+  final Set<String> _completing = {};
   bool _showMapView = false;
   String _courierStatus = 'available';
   GoogleMapController? _mapController;
@@ -201,8 +202,8 @@ class _CourierDashboardState extends State<CourierDashboard> {
                   backgroundColor: Colors.green,
                 ),
               );
-              //navigate to pickup location
-              _showNavigationPrompt(delivery, 'pickup');
+              //navigate to dropoff location
+              _showNavigationPrompt(delivery, 'dropoff');
             }
           });
         break;
@@ -218,12 +219,16 @@ class _CourierDashboardState extends State<CourierDashboard> {
         delivery.dropoffLocation.latitude, delivery.dropoffLocation.longitude,
       );
       if (dropDist < 0.2) {
+        if (_completing.contains(delivery.id)) break;
+        _completing.add(delivery.id);
         DeliveryService.updateDeliveryStatus(delivery.id, 'completed')
           .then((resp) {
             if (resp.success) {
               setState(() {
                 delivery.status = 'completed';
                 _allDeliveries.removeWhere((d) => d.id == delivery.id);
+                _availableDeliveries.removeWhere((d) => d.id == delivery.id);
+                _myDeliveries.removeWhere((d) => d.id == delivery.id);
               });
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -243,10 +248,8 @@ class _CourierDashboardState extends State<CourierDashboard> {
                   backgroundColor: Colors.green,
                 ),
               );
-              //navigate to dropoff location
-              _showNavigationPrompt(delivery, 'dropoff');
             }
-          });
+          }).whenComplete(() => _completing.remove(delivery.id));
         break;
       }
     }
@@ -300,7 +303,10 @@ class _CourierDashboardState extends State<CourierDashboard> {
   Future<void> _loadDeliveries() async {
     // 1. Fetch all deliveries from the backend
     final resp = await DeliveryService.getDeliveries();
-
+    print('helloooooooooo');
+    print('helloooooooooo');
+    print('helloooooooooo');
+    print('helloooooooooo');
     // 2. If there was an error, show it and stop
     if (!resp.success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -329,7 +335,7 @@ class _CourierDashboardState extends State<CourierDashboard> {
           delivery.pickupLocation.latitude,
           delivery.pickupLocation.longitude,
         );
-        return distance <= _operationalRadius && delivery.status == 'pending'|| delivery.status == 'accepted'||
+        return delivery.status == 'pending'|| delivery.status == 'accepted'||
          delivery.status == 'in_progress';
       }).toList();
     });
